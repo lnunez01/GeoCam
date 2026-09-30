@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "GeoCam",
+    "slug": "geocam",
+    "scheme": "geocam",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.uniguajira.geocam"
+    },
+    "android": {
+      "package": "com.uniguajira.geocam",
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0a0a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "GeoCam usa la cámara para tomar fotos geolocalizadas.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "GeoCam usa tu ubicación para registrar dónde tomaste cada foto."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GeoCam accede a tu galería para importar fotos."
+        }
+      ]
+    ]
+  }
+}
