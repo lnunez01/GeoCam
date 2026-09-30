@@ -53,4 +53,10 @@
 
 - `npx tsc --noEmit` y `npx expo lint`: sin errores.
 - `npx expo export --platform android`: el bundle compila.
-- Pruebas en teléfono físico (concedido / rechazado / bloqueado, cleanup con log): _completar tras probar_.
+- Pruebas en iPhone físico con Expo Go (capturas en `docs/screenshots/`):
+  - Cámara rechazada → estado `blocked` inmediato (iOS da una sola oportunidad) con "Abrir Ajustes".
+  - Tras activar la cámara en Ajustes y volver, la app detectó el permiso sola y mostró la cámara.
+  - Ubicación rechazada → la cámara siguió funcionando y la foto se guardó sin coordenadas.
+  - Ubicación concedida en Ajustes → coordenadas en vivo con precisión de ±6 m.
+- Problema de entorno: Expo Go en iOS exigía la misma cuenta de Expo en el teléfono y en la CLI;
+  se resolvió con `npx expo login`.

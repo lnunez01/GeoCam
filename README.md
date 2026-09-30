@@ -56,9 +56,12 @@ de modo que si el usuario lo activó en Ajustes la pantalla pasa sola a `granted
 | Concedido | Rechazado | Bloqueado |
 | :---: | :---: | :---: |
 | ![Concedido](docs/screenshots/concedido.png) | ![Rechazado](docs/screenshots/rechazado.png) | ![Bloqueado](docs/screenshots/bloqueado.png) |
-| Cámara activa con coordenadas en vivo | Pantalla previa con "Permitir acceso" / banner "Sin ubicación" | Botón **"Abrir Ajustes"** |
+| Cámara y ubicación concedidas: coordenadas en vivo (±6 m) | Ubicación rechazada: la cámara sigue funcionando, la foto se guarda sin coordenadas (∅) y el banner lo comunica | Cámara bloqueada: botón **"Abrir Ajustes"** y alternativa "Importar desde galería" |
 
-> Las capturas se toman en un teléfono físico (ver [docs/screenshots/README.md](docs/screenshots/README.md)).
+> Capturas tomadas en un iPhone físico con Expo Go. En iOS el sistema da **una sola oportunidad**:
+> al primer "No permitir", `canAskAgain` pasa a `false` y el estado va directo a `blocked`, por eso
+> el banner de ubicación rechazada ofrece "Abrir Ajustes". En Android se ve primero `denied`
+> ("Permitir ubicación") y solo tras el segundo rechazo `blocked`.
 
 ## Checklist de entrega
 
