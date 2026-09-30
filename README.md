@@ -3,6 +3,8 @@
 Cámara que etiqueta cada foto con coordenadas GPS y reacciona al movimiento del teléfono.
 Taller Integrador 2 · **Semana 6: Módulos Nativos y Sensores del Dispositivo**.
 
+**Integrantes:** Luis Nuñez, Amand Herrera
+
 Construida con **Expo SDK 57**, Expo Router y TypeScript estricto. Todo el acceso al hardware
 está encapsulado en Custom Hooks tipados (sin `any`) que exponen los errores como estado para la UI.
 

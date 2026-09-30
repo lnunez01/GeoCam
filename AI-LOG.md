@@ -1,6 +1,6 @@
 # Registro de Auditoría de IA (AI-LOG)
 
-**Estudiante(s):** _Nombre Apellido, Nombre Apellido_
+**Estudiante(s):** Luis Nuñez, Amand Herrera
 **Semana:** 6
 **Proyecto:** GeoCam – Taller Integrador 2
 **Herramienta:** Claude Code (asistente de programación con IA)
@@ -58,5 +58,8 @@
   - Tras activar la cámara en Ajustes y volver, la app detectó el permiso sola y mostró la cámara.
   - Ubicación rechazada → la cámara siguió funcionando y la foto se guardó sin coordenadas.
   - Ubicación concedida en Ajustes → coordenadas en vivo con precisión de ±6 m.
+  - Pestaña Mapa: la foto tomada aparece correctamente.
+  - Al agitar el teléfono aparece el `Alert` para borrar todas las fotos (useShake).
+  - Al cambiar de pestaña, la consola de Metro muestra `[useGeoLocation] cleanup: GPS detenido`.
 - Problema de entorno: Expo Go en iOS exigía la misma cuenta de Expo en el teléfono y en la CLI;
   se resolvió con `npx expo login`.
