@@ -1,4 +1,4 @@
-import { and, desc, eq, getTableColumns, isNotNull, isNull, like, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, isNotNull, isNull, like, lt, not, or, type SQL } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 import { db } from '@/db/client';
 import { albums, photos, type NewPhoto } from '@/db/schema';
@@ -63,6 +63,24 @@ export const photosRepo = {
       .update(photos)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(photos.id, id));
+  },
+
+  /**
+   * Fotos pendientes de subir: nunca subidas (syncedAt vacío) o editadas después de la última
+   * subida (syncedAt < updatedAt). Las de prueba de las herramientas de desarrollo no cuentan.
+   */
+  pendingUploads() {
+    return db
+      .select()
+      .from(photos)
+      .where(
+        and(
+          or(isNull(photos.syncedAt), lt(photos.syncedAt, photos.updatedAt)),
+          not(like(photos.uri, 'file:///dev-seed/%'))
+        )
+      )
+      .orderBy(asc(photos.createdAt))
+      .all();
   },
 
   /** Marca la foto como subida. NO toca updatedAt: si lo hiciera, la foto volvería a quedar pendiente. */

@@ -38,3 +38,12 @@ create policy "leer mi carpeta" on storage.objects
 create policy "borrar de mi carpeta" on storage.objects
   for delete to authenticated
   using (bucket_id = 'geocam' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
+-- ---------------------------------------------------------------------------
+-- Trabajo para la casa (C2): la subida usa upsert por client_id para no duplicar filas.
+-- Upsert necesita poder ACTUALIZAR la fila existente; sin esta política, repetir la
+-- subida de una foto (o subir una nota editada) falla por RLS.
+create policy "actualizar las mías" on public.photos
+  for update to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);

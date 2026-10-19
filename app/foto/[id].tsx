@@ -133,10 +133,8 @@ export default function FotoDetalleScreen() {
 
       <View style={styles.section}>
         <Text style={styles.label}>Nube</Text>
-        {photo.remotePath ? (
-          <Text style={styles.cloudOk}>
-            ☁️ Subida a la nube{photo.synced ? '' : ' · tiene cambios sin subir'}
-          </Text>
+        {photo.synced ? (
+          <Text style={styles.cloudOk}>☁️ Subida a la nube</Text>
         ) : (
           <Pressable
             onPress={handleUpload}
@@ -146,7 +144,9 @@ export default function FotoDetalleScreen() {
             {uploading ? (
               <ActivityIndicator color={colors.background} />
             ) : (
-              <Text style={styles.buttonText}>☁️ Subir a la nube</Text>
+              <Text style={styles.buttonText}>
+                {photo.remotePath ? '☁️ Subir cambios' : '☁️ Subir a la nube'}
+              </Text>
             )}
           </Pressable>
         )}

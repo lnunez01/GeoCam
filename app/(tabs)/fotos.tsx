@@ -8,6 +8,7 @@ import { PhotoImage } from '@/components/PhotoImage';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
+import { useCloudSync } from '@/hooks/useCloudSync';
 import { useDevTools } from '@/hooks/useDevTools';
 import { usePhotos } from '@/hooks/usePhotos';
 import type { Album, AlbumFilter, GeoPhoto } from '@/types/geo';
@@ -31,6 +32,7 @@ export default function FotosScreen() {
   const { photos } = usePhotos({ search, albumId: albumFilter, onlyFavorites });
   const { albums, createAlbum, renameAlbum, removeAlbum } = useAlbums();
   const devTools = useDevTools();
+  const cloudSync = useCloudSync();
 
   const confirmRemoveAlbum = (album: Album) => {
     Alert.alert(`¿Eliminar "${album.name}"?`, 'Las fotos quedarán sin álbum, no se borran.', [
@@ -92,6 +94,20 @@ export default function FotosScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Fotos</Text>
         <View style={styles.headerActions}>
+          <Pressable
+            onPress={cloudSync.sync}
+            disabled={cloudSync.isSyncing}
+            style={[styles.devButton, styles.syncButton]}
+            hitSlop={8}
+          >
+            <Text style={styles.syncText}>
+              {cloudSync.progress && cloudSync.progress.total > 0
+                ? `☁️ ${cloudSync.progress.current} de ${cloudSync.progress.total}`
+                : cloudSync.isSyncing
+                  ? '☁️ …'
+                  : '☁️ Sincronizar'}
+            </Text>
+          </Pressable>
           {/* Herramientas de rendimiento: solo existen en desarrollo */}
           {__DEV__ && (
             <Pressable onPress={devTools.openMenu} style={styles.devButton} hitSlop={8}>
@@ -187,6 +203,8 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 28, fontWeight: '800' },
   headerActions: { flexDirection: 'row', gap: 8 },
+  syncButton: { borderColor: colors.accent },
+  syncText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
   devButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,
