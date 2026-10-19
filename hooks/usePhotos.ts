@@ -3,6 +3,7 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { photosRepo } from '@/db/repositories/photos';
 import type { Photo } from '@/db/schema';
 import { useAlbumsVersion } from '@/hooks/useAlbumsVersion';
+import { deleteRemotePhoto } from '@/services/cloudPhotos';
 import { deletePhotoFile, persistPhoto } from '@/services/photoFiles';
 import type { Coords, GeoPhoto, PhotoFilters } from '@/types/geo';
 
@@ -45,6 +46,11 @@ export function toGeoPhoto(row: PhotoRow): GeoPhoto {
  */
 export async function removePhotoById(id: number): Promise<void> {
   const row = photosRepo.findById(id);
+  // C3: si la foto está en la nube, se borra allá primero. Si falla (p. ej. sin internet),
+  // deleteRemotePhoto lanza el error y la copia local se conserva: nada queda a medias.
+  if (row?.remotePath && row.clientId) {
+    await deleteRemotePhoto(row.clientId, row.remotePath);
+  }
   await photosRepo.remove(id);
   if (row) deletePhotoFile(row.uri);
 }

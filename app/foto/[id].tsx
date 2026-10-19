@@ -69,14 +69,21 @@ export default function FotoDetalleScreen() {
   };
 
   const handleDelete = () => {
-    Alert.alert('¿Eliminar esta foto?', 'No se puede deshacer.', [
+    const message = photo.remotePath
+      ? 'Se borrará del teléfono y de la nube. No se puede deshacer.'
+      : 'No se puede deshacer.';
+    Alert.alert('¿Eliminar esta foto?', message, [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar',
         style: 'destructive',
         onPress: async () => {
-          await remove();
-          router.back();
+          try {
+            await remove();
+            router.back();
+          } catch (e) {
+            Alert.alert('No se pudo eliminar', e instanceof Error ? e.message : String(e));
+          }
         },
       },
     ]);

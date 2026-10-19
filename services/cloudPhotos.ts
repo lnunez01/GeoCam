@@ -106,6 +106,38 @@ export async function syncPending(
   return result;
 }
 
+/** Error de red de fetch/supabase-js: el teléfono no tiene conexión o el servidor no responde. */
+function isNetworkError(message: string) {
+  const m = message.toLowerCase();
+  return m.includes('network request failed') || m.includes('failed to fetch') || m.includes('network');
+}
+
+/**
+ * Borra de la nube la fila y el archivo de una foto (C3).
+ * Si algo falla lanza un error y NO se debe borrar la copia local: así nada queda a medias.
+ */
+export async function deleteRemotePhoto(clientId: string, remotePath: string) {
+  const fail = (message: string): never => {
+    throw new Error(
+      isNetworkError(message)
+        ? 'Sin conexión. No se borró nada: intenta de nuevo cuando tengas internet.'
+        : `No se pudo borrar de la nube, así que no se borró nada: ${message}`
+    );
+  };
+
+  // 1. Comprobar la conexión antes de tocar nada (una consulta liviana)
+  const { error: checkError } = await supabase.from('photos').select('id').eq('client_id', clientId).limit(1);
+  if (checkError) fail(checkError.message);
+
+  // 2. Primero la fila: sin fila, la foto deja de aparecer en la pestaña Nube de cualquier teléfono
+  const { error: rowError } = await supabase.from('photos').delete().eq('client_id', clientId);
+  if (rowError) fail(rowError.message);
+
+  // 3. Después el archivo del bucket
+  const { error: fileError } = await supabase.storage.from(BUCKET).remove([remotePath]);
+  if (fileError) fail(fileError.message);
+}
+
 /** URL temporal (1 hora) para ver un archivo de un bucket privado. */
 export async function signedUrl(path: string) {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);

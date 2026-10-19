@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, type Region } from 'react-native-maps';
 import { router, useIsFocused } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -104,9 +104,13 @@ export default function MapaScreen() {
                 <Text style={styles.detail}>Ver detalle</Text>
               </Pressable>
               <Pressable
-                onPress={() => {
-                  removePhoto(selected.id);
-                  setSelectedId(null);
+                onPress={async () => {
+                  try {
+                    await removePhoto(selected.id);
+                    setSelectedId(null);
+                  } catch (e) {
+                    Alert.alert('No se pudo eliminar', e instanceof Error ? e.message : String(e));
+                  }
                 }}
               >
                 <Text style={styles.delete}>Eliminar</Text>
