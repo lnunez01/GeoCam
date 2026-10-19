@@ -32,6 +32,8 @@ yarn-error.*
 
 # local env files
 .env*.local
+# Credenciales de Supabase (Semana 8): nunca van a GitHub
+.env
 
 # typescript
 *.tsbuildinfo
