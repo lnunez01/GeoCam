@@ -45,7 +45,8 @@
           "photosPermission": "GeoCam accede a tu galería para importar fotos."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-secure-store"
     ]
   }
 }
