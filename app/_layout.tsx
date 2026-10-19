@@ -12,9 +12,22 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 // Sin sesión, las pantallas privadas no existen para el navegador y el usuario cae en el login
 function RootNavigator() {
   const { session, isLoading } = useAuth();
+  const userId = session?.user.id;
 
-  // Mientras se lee la sesión guardada en SecureStore
-  if (isLoading) {
+  // C5: al iniciar sesión, las fotos viejas sin dueño se asignan antes de mostrar las pestañas
+  const [claimedFor, setClaimedFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      photosRepo.claimUnowned(userId);
+    } catch (e) {
+      if (__DEV__) console.warn('[db] claimUnowned falló', e);
+    }
+    setClaimedFor(userId);
+  }, [userId]);
+
+  // Mientras se lee la sesión guardada en SecureStore (o se asignan las fotos sin dueño)
+  if (isLoading || (userId && claimedFor !== userId)) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} size="large" />

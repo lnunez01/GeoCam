@@ -38,9 +38,18 @@ export const photos = sqliteTable(
     // Ruta del archivo en el bucket y momento de la última sincronización
     remotePath: text('remote_path'),
     syncedAt: integer('synced_at', { mode: 'timestamp_ms' }),
+
+    // --- C5: datos locales por usuario ---
+    // id de Supabase Auth del dueño. Opcional por la misma razón que las anteriores;
+    // las fotos viejas sin dueño se asignan con photosRepo.claimUnowned al iniciar sesión.
+    ownerId: text('owner_id'),
   },
   // Las listas se ordenan por fecha descendente: el índice evita ordenar toda la tabla
-  (t) => [index('photos_created_at_idx').on(t.createdAt)]
+  (t) => [
+    index('photos_created_at_idx').on(t.createdAt),
+    // Todas las consultas filtran por dueño
+    index('photos_owner_id_idx').on(t.ownerId),
+  ]
 );
 
 export type Album = typeof albums.$inferSelect;

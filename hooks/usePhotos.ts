@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { useAuth } from '@/context/AuthContext';
 import { photosRepo } from '@/db/repositories/photos';
 import type { Photo } from '@/db/schema';
 import { useAlbumsVersion } from '@/hooks/useAlbumsVersion';
@@ -57,14 +58,17 @@ export async function removePhotoById(id: number): Promise<void> {
 
 export function usePhotos({ search = '', albumId = null, onlyFavorites = false }: PhotoFilters = {}) {
   const albumsVersion = useAlbumsVersion();
-  // Las dependencias hacen que la consulta se reconstruya al cambiar un filtro
-  const filtered = useLiveQuery(photosRepo.filteredQuery({ search, albumId, onlyFavorites }), [
+  // Las pestañas solo existen con sesión (Stack.Protected), así que siempre hay un usuario
+  const ownerId = useAuth().session?.user.id ?? '';
+  // Las dependencias hacen que la consulta se reconstruya al cambiar un filtro o de usuario
+  const filtered = useLiveQuery(photosRepo.filteredQuery(ownerId, { search, albumId, onlyFavorites }), [
+    ownerId,
     search,
     albumId,
     onlyFavorites,
     albumsVersion,
   ]);
-  const located = useLiveQuery(photosRepo.withLocationQuery(), [albumsVersion]);
+  const located = useLiveQuery(photosRepo.withLocationQuery(ownerId), [ownerId, albumsVersion]);
 
   const photos = useMemo(() => filtered.data.map(toGeoPhoto), [filtered.data]);
   const photosWithLocation = useMemo(() => located.data.map(toGeoPhoto), [located.data]);
@@ -73,6 +77,7 @@ export function usePhotos({ search = '', albumId = null, onlyFavorites = false }
     const permanentUri = await persistPhoto(uri);
     try {
       await photosRepo.create({
+        ownerId,
         uri: permanentUri,
         source,
         latitude: coords?.latitude ?? null,
@@ -84,15 +89,16 @@ export function usePhotos({ search = '', albumId = null, onlyFavorites = false }
       deletePhotoFile(permanentUri);
       throw e;
     }
-  }, []);
+  }, [ownerId]);
 
   const removePhoto = useCallback((id: number) => removePhotoById(id), []);
 
+  /** Borra del teléfono solo las fotos del usuario de la sesión (la copia en la nube se conserva). */
   const clearAll = useCallback(async () => {
-    const uris = photosRepo.allUris();
-    await photosRepo.clearAll();
+    const uris = photosRepo.allUris(ownerId);
+    await photosRepo.clearAll(ownerId);
     uris.forEach(({ uri }) => deletePhotoFile(uri));
-  }, []);
+  }, [ownerId]);
 
   return {
     photos,

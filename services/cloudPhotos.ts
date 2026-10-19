@@ -89,7 +89,7 @@ export async function syncPending(
   userId: string,
   onProgress?: (current: number, total: number) => void
 ): Promise<SyncResult> {
-  const pending = photosRepo.pendingUploads();
+  const pending = photosRepo.pendingUploads(userId);
   const result: SyncResult = { total: pending.length, uploaded: 0, failed: 0, firstError: null };
 
   for (let i = 0; i < pending.length; i++) {

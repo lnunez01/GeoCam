@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { useAuth } from '@/context/AuthContext';
 import { photosRepo } from '@/db/repositories/photos';
 import { useAlbumsVersion } from '@/hooks/useAlbumsVersion';
 import { removePhotoById, toGeoPhoto } from '@/hooks/usePhotos';
@@ -8,7 +9,12 @@ import type { GeoPhoto } from '@/types/geo';
 /** Detalle reactivo de una foto. photo es null si no existe (p. ej. ya se borró). */
 export function usePhoto(id: number) {
   const albumsVersion = useAlbumsVersion();
-  const { data, error, updatedAt } = useLiveQuery(photosRepo.detailQuery(id), [id, albumsVersion]);
+  const ownerId = useAuth().session?.user.id ?? '';
+  const { data, error, updatedAt } = useLiveQuery(photosRepo.detailQuery(ownerId, id), [
+    ownerId,
+    id,
+    albumsVersion,
+  ]);
 
   const photo: GeoPhoto | null = useMemo(() => (data[0] ? toGeoPhoto(data[0]) : null), [data]);
   const favorite = photo?.favorite ?? false;

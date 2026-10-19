@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, isNotNull, isNull, like, lt, not, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, isNotNull, isNull, like, lt, not, or, sql, type SQL } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 import { db } from '@/db/client';
 import { albums, photos, type NewPhoto } from '@/db/schema';
@@ -14,18 +14,23 @@ function selectWithAlbum() {
     .leftJoin(albums, eq(photos.albumId, albums.id));
 }
 
+/** C5: cada consulta de fotos se limita al usuario de la sesión. */
+const ownedBy = (ownerId: string) => eq(photos.ownerId, ownerId);
+
 export const photosRepo = {
   /** Consulta sin ejecutar: la ejecuta useLiveQuery para mantenerse reactiva. */
-  listQuery() {
-    return selectWithAlbum().orderBy(desc(photos.createdAt));
+  listQuery(ownerId: string) {
+    return selectWithAlbum().where(ownedBy(ownerId)).orderBy(desc(photos.createdAt));
   },
 
-  withLocationQuery() {
-    return selectWithAlbum().where(isNotNull(photos.latitude)).orderBy(desc(photos.createdAt));
+  withLocationQuery(ownerId: string) {
+    return selectWithAlbum()
+      .where(and(ownedBy(ownerId), isNotNull(photos.latitude)))
+      .orderBy(desc(photos.createdAt));
   },
 
-  filteredQuery({ search, albumId = null, onlyFavorites = false }: PhotoFilters) {
-    const conditions: SQL[] = [];
+  filteredQuery(ownerId: string, { search, albumId = null, onlyFavorites = false }: PhotoFilters) {
+    const conditions: SQL[] = [ownedBy(ownerId)];
     const term = search?.trim();
     if (term) conditions.push(like(photos.note, `%${term}%`));
     if (albumId === 'none') conditions.push(isNull(photos.albumId));
@@ -33,23 +38,26 @@ export const photosRepo = {
     if (onlyFavorites) conditions.push(eq(photos.favorite, true));
 
     return selectWithAlbum()
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(photos.createdAt));
   },
 
-  detailQuery(id: number) {
-    return selectWithAlbum().where(eq(photos.id, id)).limit(1);
+  /** Una foto de otro usuario no se encuentra, aunque se conozca su id. */
+  detailQuery(ownerId: string, id: number) {
+    return selectWithAlbum()
+      .where(and(ownedBy(ownerId), eq(photos.id, id)))
+      .limit(1);
   },
 
-  allUris() {
-    return db.select({ uri: photos.uri }).from(photos).all();
+  allUris(ownerId: string) {
+    return db.select({ uri: photos.uri }).from(photos).where(ownedBy(ownerId)).all();
   },
 
   findById(id: number) {
     return db.select().from(photos).where(eq(photos.id, id)).get();
   },
 
-  create(data: Omit<NewPhoto, 'id' | 'clientId'>) {
+  create(data: Omit<NewPhoto, 'id' | 'clientId'> & { ownerId: string }) {
     return db
       .insert(photos)
       .values({ ...data, clientId: Crypto.randomUUID() })
@@ -69,12 +77,13 @@ export const photosRepo = {
    * Fotos pendientes de subir: nunca subidas (syncedAt vacío) o editadas después de la última
    * subida (syncedAt < updatedAt). Las de prueba de las herramientas de desarrollo no cuentan.
    */
-  pendingUploads() {
+  pendingUploads(ownerId: string) {
     return db
       .select()
       .from(photos)
       .where(
         and(
+          ownedBy(ownerId),
           or(isNull(photos.syncedAt), lt(photos.syncedAt, photos.updatedAt)),
           not(like(photos.uri, 'file:///dev-seed/%'))
         )
@@ -110,7 +119,21 @@ export const photosRepo = {
     return db.delete(photos).where(eq(photos.id, id));
   },
 
-  clearAll() {
-    return db.delete(photos);
+  clearAll(ownerId: string) {
+    return db.delete(photos).where(ownedBy(ownerId));
+  },
+
+  /**
+   * Las fotos tomadas antes del C5 no tienen dueño. Al iniciar sesión se asignan:
+   * 1. Las que ya se habían subido pertenecen al usuario de su carpeta en el bucket
+   *    (remotePath = '<userId>/<clientId>.jpg').
+   * 2. El resto, al usuario que inicia sesión (eran de quien usaba el teléfono antes de las cuentas).
+   */
+  claimUnowned(ownerId: string) {
+    db.update(photos)
+      .set({ ownerId: sql`substr(${photos.remotePath}, 1, instr(${photos.remotePath}, '/') - 1)` })
+      .where(and(isNull(photos.ownerId), isNotNull(photos.remotePath)))
+      .run();
+    db.update(photos).set({ ownerId }).where(isNull(photos.ownerId)).run();
   },
 };
