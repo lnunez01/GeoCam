@@ -6,6 +6,7 @@ import { AlbumNameModal } from '@/components/AlbumNameModal';
 import { Chip } from '@/components/Chip';
 import { PhotoImage } from '@/components/PhotoImage';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
 import { useDevTools } from '@/hooks/useDevTools';
 import { usePhotos } from '@/hooks/usePhotos';
@@ -21,6 +22,7 @@ function notePreview(note: string | null): string | null {
 
 export default function FotosScreen() {
   const insets = useSafeAreaInsets();
+  const { session, signOut } = useAuth();
   const [search, setSearch] = useState('');
   const [albumFilter, setAlbumFilter] = useState<AlbumFilter>(null);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
@@ -88,12 +90,27 @@ export default function FotosScreen() {
     <View style={[styles.fill, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
         <Text style={styles.title}>Fotos</Text>
-        {/* Herramientas de rendimiento: solo existen en desarrollo */}
-        {__DEV__ && (
-          <Pressable onPress={devTools.openMenu} style={styles.devButton} hitSlop={8}>
-            <Text style={styles.devText}>⚙️ Dev</Text>
+        <View style={styles.headerActions}>
+          {/* Herramientas de rendimiento: solo existen en desarrollo */}
+          {__DEV__ && (
+            <Pressable onPress={devTools.openMenu} style={styles.devButton} hitSlop={8}>
+              <Text style={styles.devText}>⚙️ Dev</Text>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={() =>
+              Alert.alert('Cerrar sesión', session?.user.email ?? undefined, [
+                { text: 'Cancelar', style: 'cancel' },
+                // Al cerrar sesión, Stack.Protected lleva al login sin navegar a mano
+                { text: 'Cerrar sesión', style: 'destructive', onPress: signOut },
+              ])
+            }
+            style={styles.devButton}
+            hitSlop={8}
+          >
+            <Text style={styles.devText}>Salir</Text>
           </Pressable>
-        )}
+        </View>
       </View>
       <TextInput
         value={search}
@@ -168,6 +185,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: { color: colors.text, fontSize: 28, fontWeight: '800' },
+  headerActions: { flexDirection: 'row', gap: 8 },
   devButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,
