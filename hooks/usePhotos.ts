@@ -31,6 +31,11 @@ export function toGeoPhoto(row: PhotoRow): GeoPhoto {
     favorite: row.favorite,
     albumId: row.albumId,
     albumName: row.albumName,
+    remotePath: row.remotePath,
+    // Pendiente de subir: syncedAt vacío o anterior a la última edición del usuario
+    synced:
+      row.syncedAt !== null &&
+      row.syncedAt.getTime() >= (row.updatedAt ?? row.createdAt).getTime(),
   };
 }
 

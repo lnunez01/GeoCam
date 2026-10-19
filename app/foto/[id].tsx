@@ -13,8 +13,10 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Chip } from '@/components/Chip';
 import { PhotoImage } from '@/components/PhotoImage';
 import { colors } from '@/constants/theme';
+import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
 import { usePhoto } from '@/hooks/usePhoto';
+import { uploadPhotoById } from '@/services/cloudPhotos';
 
 const headerOptions = {
   headerShown: true,
@@ -29,6 +31,8 @@ export default function FotoDetalleScreen() {
   const id = Number(params.id);
   const { photo, isLoading, updateNote, toggleFavorite, moveToAlbum, remove } = usePhoto(id);
   const { albums } = useAlbums();
+  const { session } = useAuth();
+  const [uploading, setUploading] = useState(false);
 
   if (isLoading) {
     return (
@@ -50,6 +54,19 @@ export default function FotoDetalleScreen() {
       </View>
     );
   }
+
+  const handleUpload = async () => {
+    if (!session) return;
+    setUploading(true);
+    try {
+      await uploadPhotoById(photo.id, session.user.id);
+      Alert.alert('Listo', 'La foto quedó guardada en la nube.');
+    } catch (e) {
+      Alert.alert('No se pudo subir', e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleDelete = () => {
     Alert.alert('¿Eliminar esta foto?', 'No se puede deshacer.', [
@@ -111,6 +128,27 @@ export default function FotoDetalleScreen() {
         </View>
         {albums.length === 0 && (
           <Text style={styles.muted}>Crea álbumes desde la pestaña Fotos con «+ Álbum».</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Nube</Text>
+        {photo.remotePath ? (
+          <Text style={styles.cloudOk}>
+            ☁️ Subida a la nube{photo.synced ? '' : ' · tiene cambios sin subir'}
+          </Text>
+        ) : (
+          <Pressable
+            onPress={handleUpload}
+            disabled={uploading}
+            style={[styles.button, styles.cloudButton, uploading && { opacity: 0.6 }]}
+          >
+            {uploading ? (
+              <ActivityIndicator color={colors.background} />
+            ) : (
+              <Text style={styles.buttonText}>☁️ Subir a la nube</Text>
+            )}
+          </Pressable>
         )}
       </View>
 
@@ -184,6 +222,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   buttonText: { color: '#0a0a0a', fontWeight: '700' },
+  cloudButton: { alignSelf: 'stretch', alignItems: 'center' },
+  cloudOk: { color: colors.accent, fontWeight: '600' },
   deleteButton: { alignSelf: 'stretch', alignItems: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
   deleteText: { color: colors.danger, fontWeight: '700' },
 });

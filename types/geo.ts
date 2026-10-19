@@ -23,6 +23,10 @@ export interface GeoPhoto {
   favorite: boolean;
   albumId: number | null;
   albumName: string | null;
+  /** Ruta en el bucket de Supabase; null si nunca se ha subido. */
+  remotePath: string | null;
+  /** true si la última versión de la foto ya está en la nube (syncedAt >= updatedAt). */
+  synced: boolean;
 }
 
 export interface Album {
