@@ -138,6 +138,52 @@ export async function deleteRemotePhoto(clientId: string, remotePath: string) {
   if (fileError) fail(fileError.message);
 }
 
+/** Fila de la tabla photos de Supabase (lo que muestra la pestaña Nube). */
+export interface RemotePhoto {
+  id: number;
+  client_id: string;
+  storage_path: string;
+  latitude: number | null;
+  longitude: number | null;
+  note: string | null;
+  favorite: boolean;
+  source: 'camera' | 'gallery';
+  taken_at: string;
+  updated_at: string;
+}
+
+export interface RemotePhotoWithUrl extends RemotePhoto {
+  /** URL firmada temporal; null si no se pudo generar (p. ej. el archivo ya no existe). */
+  url: string | null;
+}
+
+/**
+ * Fotos del usuario guardadas en Supabase con su URL firmada (C4).
+ * RLS ya filtra por dueño: no hace falta un where user_id = ...
+ */
+export async function listRemotePhotos(): Promise<RemotePhotoWithUrl[]> {
+  const { data, error } = await supabase
+    .from('photos')
+    .select('id, client_id, storage_path, latitude, longitude, note, favorite, source, taken_at, updated_at')
+    .order('taken_at', { ascending: false });
+  if (error) throw error;
+
+  const rows = (data ?? []) as RemotePhoto[];
+  if (rows.length === 0) return [];
+
+  // Una sola petición para todas las URLs firmadas (el bucket es privado)
+  const { data: signed, error: signError } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrls(
+      rows.map((r) => r.storage_path),
+      3600
+    );
+  if (signError) throw signError;
+
+  const urlByPath = new Map(signed.map((s) => [s.path, s.error ? null : s.signedUrl]));
+  return rows.map((r) => ({ ...r, url: urlByPath.get(r.storage_path) ?? null }));
+}
+
 /** URL temporal (1 hora) para ver un archivo de un bucket privado. */
 export async function signedUrl(path: string) {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);

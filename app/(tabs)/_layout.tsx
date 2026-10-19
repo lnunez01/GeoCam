@@ -33,6 +33,13 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🗂️</Text>,
         }}
       />
+      <Tabs.Screen
+        name="nube"
+        options={{
+          title: 'Nube',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>☁️</Text>,
+        }}
+      />
     </Tabs>
   );
 }
