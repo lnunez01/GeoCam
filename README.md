@@ -1,13 +1,152 @@
 # GeoCam 📷📍
 
 Cámara que etiqueta cada foto con coordenadas GPS, reacciona al movimiento del teléfono y guarda
-todo en una base de datos local para funcionar sin conexión.
-Taller Integrador 2 · **Semana 6: Módulos Nativos y Sensores** · **Semana 7: Persistencia con Drizzle ORM + SQLite**.
+todo en una base de datos local para funcionar sin conexión, con cuentas de usuario y respaldo en Supabase.
+Taller Integrador 2 · **Semana 6: Módulos Nativos y Sensores** · **Semana 7: Persistencia con Drizzle ORM + SQLite** ·
+**Semana 8: Backend as a Service con Supabase**.
 
 **Integrantes:** Luis Nuñez, Amand Herrera
 
 Construida con **Expo SDK 57**, Expo Router y TypeScript estricto. Todo el acceso al hardware
 está encapsulado en Custom Hooks tipados (sin `any`) que exponen los errores como estado para la UI.
+
+## Semana 8 – Backend as a Service con Supabase
+
+GeoCam ahora tiene cuentas de usuario y un respaldo en la nube. **SQLite sigue siendo la fuente de verdad local**:
+la app funciona igual sin internet, y Supabase es el respaldo y el punto de encuentro entre teléfonos.
+
+![Flujo Semana 8](docs/screenshots/flujo-semana8.gif)
+
+### Las dos bases
+
+```mermaid
+flowchart LR
+    subgraph Telefono["📱 Teléfono"]
+        UI["Pantallas<br/>app/"] --> Hooks["Hooks<br/>hooks/"]
+        Hooks --> Repo["Repositorios<br/>db/repositories/"]
+        Repo --> SQLite[("SQLite · geocam.db<br/>photos + albums")]
+        Hooks --> Cloud["services/cloudPhotos.ts"]
+        Auth["AuthContext"] --> Secure[("SecureStore<br/>sesión cifrada")]
+        Files[("Documentos<br/>archivos .jpg")]
+    end
+    subgraph Supabase["☁️ Supabase"]
+        SAuth["Auth<br/>JWT + refresh token"]
+        PG[("PostgreSQL · public.photos<br/>RLS por user_id")]
+        Bucket[("Storage · bucket privado geocam<br/>&lt;userId&gt;/&lt;clientId&gt;.jpg")]
+        RT["Realtime"]
+    end
+    Auth -- "signIn / signUp" --> SAuth
+    Cloud -- "upsert por client_id" --> PG
+    Cloud -- "ArrayBuffer" --> Bucket
+    Files -. "fetch(uri)" .-> Cloud
+    RT -- "postgres_changes" --> Hooks
+```
+
+`client_id` (UUID creado en el teléfono) identifica la **misma foto en los dos lados**; el `id` autoincremental solo
+vale en cada base.
+
+```mermaid
+erDiagram
+    LOCAL_PHOTOS ||--o| REMOTE_PHOTOS : "client_id"
+    LOCAL_PHOTOS {
+        integer id PK "solo vale en este teléfono"
+        text client_id "UUID, UNIQUE"
+        text owner_id "id de Supabase Auth (C5)"
+        text uri "archivo en Documentos"
+        integer updated_at "última edición del usuario"
+        text remote_path "ruta en el bucket"
+        integer synced_at "última subida"
+    }
+    REMOTE_PHOTOS {
+        bigint id PK
+        uuid user_id FK "default auth.uid()"
+        uuid client_id "UNIQUE"
+        text storage_path "UNIQUE"
+        float latitude
+        float longitude
+        text note
+        boolean favorite
+        text source "camera | gallery"
+        timestamptz taken_at
+        timestamptz updated_at
+    }
+```
+
+Una foto está **pendiente de subir** cuando `synced_at` está vacío o es anterior a `updated_at`.
+
+### Taller en clase y trabajo para la casa
+
+| Tarea | Implementación |
+| --- | --- |
+| T1. Cliente y credenciales | `lib/supabase.ts`; `.env` ignorado y `.env.example` versionado |
+| T1. Sesión segura | `lib/secureStorage.ts`: la sesión se parte en fragmentos de 1000 caracteres dentro de SecureStore (Keychain / Keystore). No se usa AsyncStorage |
+| T2. Autenticación | `context/AuthContext.tsx` (`onAuthStateChange`), `app/login.tsx`, botón **Salir** en Fotos |
+| T2. Rutas protegidas | `app/_layout.tsx`: `Stack.Protected` para `(tabs)` y `foto/[id]`; `app/index.tsx` redirige según la sesión. Sin `router.replace` |
+| T3. Backend | [`supabase/schema.sql`](supabase/schema.sql): tabla `photos` con RLS por dueño y bucket privado `geocam` |
+| T4. Migración local | `drizzle/0003_*.sql`: `client_id`, `updated_at`, `remote_path`, `synced_at`. `ensureSyncFields()` rellena las fotos viejas |
+| T5. Subida | `services/cloudPhotos.ts` → `uploadPhoto`; botón **☁️ Subir a la nube** en el detalle e ícono ☁️ en la lista |
+| C1. Subir pendientes | Botón **☁️ Sincronizar** en Fotos con avance "3 de 7"; si una falla, las demás siguen y al final se informa |
+| C2. Sin duplicados ni huérfanos | Archivo en `<userId>/<clientId>.jpg` (reutilizado si ya existe) + fila con `upsert` por `client_id`; si la fila falla se borra el archivo recién subido |
+| C3. Borrado coherente | `deleteRemotePhoto`: comprueba conexión → fila remota → archivo → copia local. Sin internet avisa y no borra nada |
+| C4. Pestaña Nube | `app/(tabs)/nube.tsx` + `hooks/useCloudPhotos.ts`: URLs firmadas en una sola petición y canal Realtime limpiado con `removeChannel` |
+| C5. Datos locales por usuario | `drizzle/0004_*.sql`: `owner_id` con índice; todas las consultas de fotos filtran por el usuario de la sesión |
+| C6. Auditoría de credenciales | Ver abajo |
+
+### Seguridad: qué llave va dónde
+
+| Llave | Dónde vive | Qué puede hacer |
+| --- | --- | --- |
+| Publishable key (`sb_publishable_…`) | `.env` → dentro del bundle de la app | Solo lo que permitan las políticas RLS |
+| Secret key (`sb_secret_…`) | **En ningún lugar del proyecto** | Se salta RLS |
+| Contraseña de la base de datos | Solo en el panel de Supabase | Conexión directa a PostgreSQL |
+
+La publishable key **es pública** (cualquiera la extrae del APK). La seguridad la ponen RLS y Auth:
+
+- `photos`: `select`, `insert`, `update` y `delete` solo cuando `auth.uid() = user_id`. `user_id` tiene
+  `default auth.uid()`: la app nunca envía el id del usuario, lo pone la base a partir del token.
+- Bucket `geocam` **privado**: solo se sube, lee y borra dentro de la carpeta `<auth.uid()>/`. Las imágenes se ven
+  con URLs firmadas que vencen en 1 hora. Es privado (a diferencia del Muro de Clase) porque una foto con
+  coordenadas es un dato personal.
+
+### C6. Auditoría de credenciales
+
+```bash
+$ git log --all --full-history -- .env
+                                          # sin resultados: .env nunca entró al historial
+$ ls -a | grep env
+.env.example                              # versionado, sin valores
+$ git grep -nI -E "sb_secret_|service_role|SERVICE_ROLE" -- . ':!*.md'
+                                          # sin resultados: no hay secret key en el código
+$ git log --all -p | grep -cE "sb_secret_[A-Za-z0-9]|sb_publishable_[A-Za-z0-9]{10}"
+0                                         # ninguna llave en ningún commit
+```
+
+`.gitignore` incluye `.env`, y `lib/supabase.ts` lee solo `EXPO_PUBLIC_SUPABASE_URL` y
+`EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+
+### Preguntas para sustentar
+
+1. **¿Por qué la publishable key puede estar en el código y la secret key no?** Todo lo que empieza por
+   `EXPO_PUBLIC_` queda escrito en el bundle y cualquiera lo puede extraer del APK. La publishable key solo puede
+   hacer lo que permiten las políticas RLS; la secret key se salta RLS y daría acceso total a la base.
+2. **Si alguien extrae la publishable key del APK, ¿qué puede hacer?** Lo mismo que la app: crear una cuenta y
+   leer, subir o borrar **sus propias** fotos. Sin la sesión de otro usuario no puede ver ni tocar filas ni
+   archivos ajenos, porque RLS compara `auth.uid()` con `user_id` y con la carpeta del bucket.
+3. **¿Qué pasa con la sesión si el usuario pasa 30 días sin abrir la app?** El access token (1 hora) ya venció,
+   pero el refresh token sigue guardado en SecureStore. Al abrir la app, supabase-js lo usa para pedir un access
+   token nuevo sin pedir la contraseña. Solo si el refresh token fue invalidado (cierre de sesión, cambio de
+   contraseña o una política de expiración del proyecto) el usuario vuelve al login.
+4. **¿Por qué la foto se sube antes que la fila, y qué problema crea ese orden?** Para que nunca exista una fila
+   que apunte a un archivo que no está: la pestaña Nube mostraría una imagen rota. El problema contrario es un
+   archivo huérfano si la fila falla. Se resuelve en `uploadPhoto` borrando el archivo recién subido antes de
+   reportar el error (C2).
+
+### Configuración para ejecutar
+
+1. Crea un proyecto en Supabase y ejecuta [`supabase/schema.sql`](supabase/schema.sql) en el SQL Editor.
+2. Copia `.env.example` como `.env` y pon la URL y la publishable key (*Project Settings → API Keys*).
+3. Para practicar, desactiva *Confirm email* en *Authentication → Sign In / Providers → Email*.
+4. `npx expo start -c` (el `-c` es necesario después de crear o cambiar el `.env`).
 
 ## Semana 7 – Persistencia offline-first
 
@@ -77,7 +216,7 @@ db/
   repositories/albums.ts    → listQuery, create, rename, remove (transacción)
   devSeed.ts                → solo desarrollo: datos de prueba y medición (reto)
 drizzle/                    → migraciones generadas por drizzle-kit (versionadas, NO se editan)
-  0000_*.sql, 0001_*.sql, 0002_*.sql, meta/, migrations.js
+  0000_*.sql … 0004_*.sql, meta/, migrations.js
 hooks/
   usePhotos.ts              → lista filtrada + fotos con ubicación + addPhoto/removePhoto/clearAll
   usePhoto.ts               → detalle reactivo + updateNote/toggleFavorite/moveToAlbum/remove
@@ -107,6 +246,8 @@ npm run db:generate          # = npx drizzle-kit generate
 | `0000_nostalgic_blonde_phantom.sql` | Crea la tabla `photos` (uri, coordenadas `real`, origen, fecha). |
 | `0001_daily_inertia.sql` | Crea `albums` (con índice único en `name`) y agrega `album_id`, `note` y `favorite` a `photos` con `ALTER TABLE … ADD`, por lo que las fotos existentes se conservan (`favorite = false`, el resto `NULL`). |
 | `0002_modern_dagger.sql` | Reto: `CREATE INDEX photos_created_at_idx ON photos (created_at)` para la lista ordenada por fecha. |
+| `0003_smooth_iron_fist.sql` | Semana 8 (T4): `client_id` (con índice único), `updated_at`, `remote_path` y `synced_at`, todas opcionales porque la tabla ya tiene filas. |
+| `0004_clear_abomination.sql` | Semana 8 (C5): `owner_id` con índice `photos_owner_id_idx`. |
 
 > **Nota:** `drizzle-kit` generó `album_id … REFERENCES albums(id)` **sin** `ON DELETE SET NULL` (la cláusula
 > solo quedó en el snapshot). Por eso `albumsRepo.remove` desvincula las fotos y borra el álbum dentro de una
@@ -158,24 +299,31 @@ el número de filas y es mayor cuando se usa `LIMIT` (paginación), porque SQLit
 ## Estructura
 
 ```
-app/_layout.tsx             → aplica migraciones (useMigrations) antes de montar el Stack
-app/index.tsx               → redirige a /geocam
+app/_layout.tsx             → migraciones → AuthProvider → Stack.Protected (Semana 8)
+app/index.tsx               → redirige a /geocam o /login según la sesión
+app/login.tsx               → registro e inicio de sesión (Semana 8)
 app/(tabs)/_layout.tsx      → Tabs
 app/(tabs)/geocam.tsx
 app/(tabs)/mapa.tsx
 app/(tabs)/fotos.tsx        → búsqueda, filtros y álbumes (Semana 7)
-app/foto/[id].tsx           → detalle y edición de una foto (Semana 7)
+app/(tabs)/nube.tsx         → fotos guardadas en Supabase, en tiempo real (Semana 8)
+app/foto/[id].tsx           → detalle y edición de una foto (Semana 7) + subir a la nube (Semana 8)
 components/AlbumNameModal.tsx
 components/Chip.tsx
 components/PhotoImage.tsx   → imagen con placeholder si el archivo ya no existe
 components/PermissionPrimer.tsx
 components/StatusBanner.tsx
 constants/theme.ts
+context/AuthContext.tsx     → sesión de Supabase (Semana 8)
 db/, drizzle/, services/    → ver "Arquitectura por capas"
+services/cloudPhotos.ts     → subir, sincronizar, borrar y listar en Supabase (Semana 8)
+supabase/schema.sql         → tabla, políticas RLS, bucket y Realtime (Semana 8)
 hooks/useCamera.ts
 hooks/useGeoLocation.ts
 hooks/useShake.ts
 hooks/usePhotos.ts, usePhoto.ts, useAlbums.ts, useAlbumsVersion.ts
+hooks/useCloudSync.ts, useCloudPhotos.ts   → botón Sincronizar y pestaña Nube (Semana 8)
+lib/supabase.ts, secureStorage.ts          → cliente y sesión cifrada por fragmentos (Semana 8)
 lib/permissions.ts          → mapPermission(): respuesta de Expo → PermissionState
 lib/photos.ts
 types/geo.ts
@@ -227,7 +375,8 @@ de modo que si el usuario lo activó en Ajustes la pantalla pasa sola a `granted
 
 ```bash
 npm install
-npx expo start          # escanea el QR con Expo Go (teléfono físico)
+cp .env.example .env    # y llena la URL y la publishable key de Supabase (ver Semana 8)
+npx expo start -c       # escanea el QR con Expo Go (teléfono físico)
 # o, si el teléfono no está en la misma red:
 npx expo start --tunnel
 ```
