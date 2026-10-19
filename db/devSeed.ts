@@ -1,4 +1,5 @@
 import { like } from 'drizzle-orm';
+import * as Crypto from 'expo-crypto';
 import { db } from '@/db/client';
 import { photos, type NewPhoto } from '@/db/schema';
 import { photosRepo } from '@/db/repositories/photos';
@@ -13,6 +14,7 @@ const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 function fakePhoto(i: number): Omit<NewPhoto, 'id'> {
   return {
     uri: `${SEED_PREFIX}${i}.jpg`,
+    clientId: Crypto.randomUUID(),
     latitude: CENTER.latitude + (Math.random() - 0.5) * 0.1,
     longitude: CENTER.longitude + (Math.random() - 0.5) * 0.1,
     accuracy: Math.round(Math.random() * 30),

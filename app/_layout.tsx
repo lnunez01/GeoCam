@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from '@/db/client';
+import { photosRepo } from '@/db/repositories/photos';
 import migrations from '@/drizzle/migrations';
 import { colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -38,6 +40,19 @@ export default function RootLayout() {
   // Primero las migraciones locales, después la autenticación.
   // Única excepción a las capas: aplicar las migraciones antes de montar cualquier pantalla
   const { success, error } = useMigrations(db, migrations);
+  const [syncFieldsReady, setSyncFieldsReady] = useState(false);
+
+  // Después de migrar: dar clientId y updatedAt a las fotos anteriores a la Semana 8
+  useEffect(() => {
+    if (!success) return;
+    try {
+      const filled = photosRepo.ensureSyncFields();
+      if (__DEV__ && filled > 0) console.log(`[db] ${filled} fotos recibieron clientId`);
+    } catch (e) {
+      if (__DEV__) console.warn('[db] ensureSyncFields falló', e);
+    }
+    setSyncFieldsReady(true);
+  }, [success]);
 
   if (error) {
     return (
@@ -50,7 +65,7 @@ export default function RootLayout() {
     );
   }
 
-  if (!success) {
+  if (!success || !syncFieldsReady) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} size="large" />

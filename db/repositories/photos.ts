@@ -1,4 +1,5 @@
 import { and, desc, eq, getTableColumns, isNotNull, isNull, like, type SQL } from 'drizzle-orm';
+import * as Crypto from 'expo-crypto';
 import { db } from '@/db/client';
 import { albums, photos, type NewPhoto } from '@/db/schema';
 import type { PhotoFilters } from '@/types/geo';
@@ -48,12 +49,43 @@ export const photosRepo = {
     return db.select().from(photos).where(eq(photos.id, id)).get();
   },
 
-  create(data: Omit<NewPhoto, 'id'>) {
-    return db.insert(photos).values(data).returning().get();
+  create(data: Omit<NewPhoto, 'id' | 'clientId'>) {
+    return db
+      .insert(photos)
+      .values({ ...data, clientId: Crypto.randomUUID() })
+      .returning()
+      .get();
   },
 
+  /** Cambios del usuario: siempre marcan updatedAt para que la foto quede pendiente de subir. */
   update(id: number, data: PhotoChanges) {
-    return db.update(photos).set(data).where(eq(photos.id, id));
+    return db
+      .update(photos)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(photos.id, id));
+  },
+
+  /** Marca la foto como subida. NO toca updatedAt: si lo hiciera, la foto volvería a quedar pendiente. */
+  markSynced(id: number, remotePath: string) {
+    return db
+      .update(photos)
+      .set({ remotePath, syncedAt: new Date() })
+      .where(eq(photos.id, id));
+  },
+
+  /**
+   * Las fotos tomadas antes de la migración de la Semana 8 quedan sin clientId ni updatedAt.
+   * Se rellenan una sola vez al arrancar, después de las migraciones.
+   */
+  ensureSyncFields() {
+    const rows = db.select().from(photos).where(isNull(photos.clientId)).all();
+    for (const row of rows) {
+      db.update(photos)
+        .set({ clientId: Crypto.randomUUID(), updatedAt: row.updatedAt ?? row.createdAt })
+        .where(eq(photos.id, row.id))
+        .run();
+    }
+    return rows.length;
   },
 
   remove(id: number) {
