@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { photosRepo } from '@/db/repositories/photos';
 import type { Photo } from '@/db/schema';
 import { useAlbumsVersion } from '@/hooks/useAlbumsVersion';
-import { deleteRemotePhoto } from '@/services/cloudPhotos';
+import { requestSync } from '@/lib/queryClient';
 import { deletePhotoFile, persistPhoto } from '@/services/photoFiles';
 import type { Coords, GeoPhoto, PhotoFilters } from '@/types/geo';
 
@@ -42,18 +42,23 @@ export function toGeoPhoto(row: PhotoRow): GeoPhoto {
 }
 
 /**
- * Compartida con usePhoto para que borrar desde el detalle haga lo mismo que desde el mapa:
- * primero el registro y luego el archivo.
+ * Borra una foto (C1 de la Semana 9). Compartida con usePhoto para que borrar desde el detalle
+ * haga lo mismo que desde el mapa.
+ * - Si nunca llegó a la nube, nadie más la conoce: se borra de verdad, fila y archivo.
+ * - Si ya está en la nube, se marca con deletedAt: push sube la marca, pull la aplica en los
+ *   demás teléfonos y los archivos se eliminan cuando la marca ya está sincronizada.
+ * Funciona igual sin conexión: la marca espera en SQLite hasta que vuelva la red.
  */
-export async function removePhotoById(id: number): Promise<void> {
+export function removePhotoById(id: number): void {
   const row = photosRepo.findById(id);
-  // C3: si la foto está en la nube, se borra allá primero. Si falla (p. ej. sin internet),
-  // deleteRemotePhoto lanza el error y la copia local se conserva: nada queda a medias.
-  if (row?.remotePath && row.clientId) {
-    await deleteRemotePhoto(row.clientId, row.remotePath);
+  if (!row) return;
+  if (row.remotePath) {
+    photosRepo.markDeleted(id);
+    requestSync();
+  } else {
+    photosRepo.hardDelete(id);
+    deletePhotoFile(row.uri);
   }
-  await photosRepo.remove(id);
-  if (row) deletePhotoFile(row.uri);
 }
 
 export function usePhotos({ search = '', albumId = null, onlyFavorites = false }: PhotoFilters = {}) {
@@ -84,6 +89,7 @@ export function usePhotos({ search = '', albumId = null, onlyFavorites = false }
         longitude: coords?.longitude ?? null,
         accuracy: coords?.accuracy ?? null,
       });
+      requestSync(); // se sube sola si hay red; si no, cuando vuelva
     } catch (e) {
       // Sin registro el archivo quedaría huérfano
       deletePhotoFile(permanentUri);
@@ -91,13 +97,11 @@ export function usePhotos({ search = '', albumId = null, onlyFavorites = false }
     }
   }, [ownerId]);
 
-  const removePhoto = useCallback((id: number) => removePhotoById(id), []);
+  const removePhoto = useCallback(async (id: number) => removePhotoById(id), []);
 
-  /** Borra del teléfono solo las fotos del usuario de la sesión (la copia en la nube se conserva). */
+  /** Borra todas las fotos del usuario de la sesión (al agitar el teléfono), con la misma regla que removePhoto. */
   const clearAll = useCallback(async () => {
-    const uris = photosRepo.allUris(ownerId);
-    await photosRepo.clearAll(ownerId);
-    uris.forEach(({ uri }) => deletePhotoFile(uri));
+    for (const row of photosRepo.listVisible(ownerId)) removePhotoById(row.id);
   }, [ownerId]);
 
   return {

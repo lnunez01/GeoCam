@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { colors } from '@/constants/theme';

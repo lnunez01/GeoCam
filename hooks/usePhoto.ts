@@ -3,6 +3,7 @@ import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useAuth } from '@/context/AuthContext';
 import { photosRepo } from '@/db/repositories/photos';
 import { useAlbumsVersion } from '@/hooks/useAlbumsVersion';
+import { requestSync } from '@/lib/queryClient';
 import { removePhotoById, toGeoPhoto } from '@/hooks/usePhotos';
 import type { GeoPhoto } from '@/types/geo';
 
@@ -23,22 +24,25 @@ export function usePhoto(id: number) {
     async (note: string) => {
       const trimmed = note.trim();
       await photosRepo.update(id, { note: trimmed === '' ? null : trimmed });
+      requestSync(); // cada cambio local pide sincronizar
     },
     [id]
   );
 
   const toggleFavorite = useCallback(async () => {
     await photosRepo.update(id, { favorite: !favorite });
+    requestSync();
   }, [id, favorite]);
 
   const moveToAlbum = useCallback(
     async (albumId: number | null) => {
       await photosRepo.update(id, { albumId });
+      requestSync();
     },
     [id]
   );
 
-  const remove = useCallback(() => removePhotoById(id), [id]);
+  const remove = useCallback(async () => removePhotoById(id), [id]);
 
   return {
     photo,

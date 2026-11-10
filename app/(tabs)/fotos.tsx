@@ -5,10 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlbumNameModal } from '@/components/AlbumNameModal';
 import { Chip } from '@/components/Chip';
 import { PhotoImage } from '@/components/PhotoImage';
+import { SyncIndicator } from '@/components/SyncIndicator';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
-import { useCloudSync } from '@/hooks/useCloudSync';
 import { useDevTools } from '@/hooks/useDevTools';
 import { usePhotos } from '@/hooks/usePhotos';
 import type { Album, AlbumFilter, GeoPhoto } from '@/types/geo';
@@ -32,7 +32,6 @@ export default function FotosScreen() {
   const { photos } = usePhotos({ search, albumId: albumFilter, onlyFavorites });
   const { albums, createAlbum, renameAlbum, removeAlbum } = useAlbums();
   const devTools = useDevTools();
-  const cloudSync = useCloudSync();
 
   const confirmRemoveAlbum = (album: Album) => {
     Alert.alert(`¿Eliminar "${album.name}"?`, 'Las fotos quedarán sin álbum, no se borran.', [
@@ -75,7 +74,7 @@ export default function FotosScreen() {
           <PhotoImage uri={item.uri} style={styles.thumb} />
           <Text style={styles.badgeLeft}>{item.coords ? '📍' : '∅'}</Text>
           {item.favorite && <Text style={styles.badgeRight}>★</Text>}
-          {item.remotePath && <Text style={styles.badgeCloud}>☁️</Text>}
+          <Text style={styles.badgeCloud}>{item.synced ? '☁️' : '⏳'}</Text>
         </View>
         <Text style={styles.album} numberOfLines={1}>
           {item.albumName ?? 'Sin álbum'}
@@ -94,20 +93,8 @@ export default function FotosScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Fotos</Text>
         <View style={styles.headerActions}>
-          <Pressable
-            onPress={cloudSync.sync}
-            disabled={cloudSync.isSyncing}
-            style={[styles.devButton, styles.syncButton]}
-            hitSlop={8}
-          >
-            <Text style={styles.syncText}>
-              {cloudSync.progress && cloudSync.progress.total > 0
-                ? `☁️ ${cloudSync.progress.current} de ${cloudSync.progress.total}`
-                : cloudSync.isSyncing
-                  ? '☁️ …'
-                  : '☁️ Sincronizar'}
-            </Text>
-          </Pressable>
+          {/* Semana 9: la sincronización es automática; el indicador abre la pantalla de estado */}
+          <SyncIndicator />
           {/* Herramientas de rendimiento: solo existen en desarrollo */}
           {__DEV__ && (
             <Pressable onPress={devTools.openMenu} style={styles.devButton} hitSlop={8}>
@@ -203,8 +190,6 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 28, fontWeight: '800' },
   headerActions: { flexDirection: 'row', gap: 8 },
-  syncButton: { borderColor: colors.accent },
-  syncText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
   devButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,

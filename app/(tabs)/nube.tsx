@@ -1,19 +1,28 @@
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PhotoImage } from '@/components/PhotoImage';
+import { SyncIndicator } from '@/components/SyncIndicator';
 import { colors } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { useCloudPhotos } from '@/hooks/useCloudPhotos';
+import { useCloudFeed, useCloudRealtime } from '@/hooks/useCloudFeed';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useIsOnline } from '@/lib/queryClient';
 import type { RemotePhotoWithUrl } from '@/services/cloudPhotos';
 
 /**
- * Pestaña Nube (C4): lo que hay en Supabase, no en el teléfono.
- * Al iniciar sesión en otro teléfono, aquí aparecen las mismas fotos.
+ * Pestaña Nube (C2): lo que hay en Supabase, no en el teléfono.
+ * Feed por cursor con infinite scroll, búsqueda en vivo por nota y los cuatro estados de UI.
+ * La caché se persiste (C3): sin conexión se ven los últimos datos cargados.
  */
 export default function NubeScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { photos, isLoading, error, reload } = useCloudPhotos();
+  const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search); // una petición al dejar de escribir
+  const isOnline = useIsOnline();
+  const feed = useCloudFeed(debouncedSearch);
+  useCloudRealtime();
 
   const renderItem = ({ item }: { item: RemotePhotoWithUrl }) => (
     <View style={styles.card}>
@@ -37,38 +46,84 @@ export default function NubeScreen() {
     </View>
   );
 
+  const emptyMessage = debouncedSearch.trim()
+    ? `Ninguna nota contiene «${debouncedSearch.trim()}».`
+    : 'Aún no hay fotos en la nube. Toma una en GeoCam: se sube sola.';
+
   return (
     <View style={[styles.fill, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.title}>Nube</Text>
           <Text style={styles.muted} numberOfLines={1}>
-            {session?.user.email} · {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}
+            {session?.user.email}
           </Text>
         </View>
-        <Pressable onPress={reload} style={styles.reloadButton} hitSlop={8}>
-          <Text style={styles.reloadText}>↻</Text>
-        </Pressable>
+        <SyncIndicator />
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {/* Estado: sin conexión (la lista guardada sigue visible) */}
+      {!isOnline && <Text style={styles.offline}>Sin conexión. Se muestran los datos guardados.</Text>}
 
-      <FlatList
-        data={photos}
-        keyExtractor={(item) => item.client_id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.grid}
-        renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.accent} />}
-        ListEmptyComponent={
-          isLoading ? undefined : (
-            <Text style={styles.empty}>
-              Aún no hay fotos en la nube. Súbelas desde la pestaña Fotos con «☁️ Sincronizar».
-            </Text>
-          )
-        }
+      <TextInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Buscar en las notas de la nube…"
+        placeholderTextColor={colors.textMuted}
+        style={styles.search}
+        clearButtonMode="while-editing"
       />
+
+      {/* Estado: primera carga */}
+      {feed.status === 'pending' && feed.fetchStatus === 'fetching' && (
+        <ActivityIndicator style={{ marginTop: 40 }} color={colors.accent} size="large" />
+      )}
+
+      {/* Estado: sin datos y sin red (nunca se pudo cargar) */}
+      {feed.status === 'pending' && feed.fetchStatus === 'paused' && (
+        <Text style={styles.empty}>Conéctate a internet para cargar tus fotos de la nube.</Text>
+      )}
+
+      {/* Estado: error, con opción de reintentar */}
+      {feed.status === 'error' && (
+        <View style={styles.center}>
+          <Text style={styles.error}>No se pudo cargar la nube: {feed.error.message}</Text>
+          <Pressable onPress={() => feed.refetch()} style={styles.retry}>
+            <Text style={styles.retryText}>Reintentar</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {feed.status === 'success' && (
+        <FlatList
+          data={feed.photos}
+          keyExtractor={(item) => item.client_id}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.grid}
+          renderItem={renderItem}
+          // Estado: vacío (distinto según haya búsqueda o no)
+          ListEmptyComponent={<Text style={styles.empty}>{emptyMessage}</Text>}
+          // Deslizar hacia abajo para refrescar
+          refreshControl={
+            <RefreshControl
+              refreshing={feed.isRefetching && !feed.isFetchingNextPage}
+              onRefresh={() => {
+                feed.refetch();
+              }}
+              tintColor={colors.accent}
+            />
+          }
+          // Infinite scroll: páginas de a 10
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            if (feed.hasNextPage && !feed.isFetchingNextPage) feed.fetchNextPage();
+          }}
+          ListFooterComponent={
+            feed.isFetchingNextPage ? <ActivityIndicator style={{ margin: 16 }} color={colors.accent} /> : undefined
+          }
+        />
+      )}
     </View>
   );
 }
@@ -79,20 +134,36 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 8,
     paddingHorizontal: 16,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   title: { color: colors.text, fontSize: 28, fontWeight: '800' },
   muted: { color: colors.textMuted, fontSize: 12 },
-  reloadButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  offline: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 8,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.warning,
+    color: '#171717',
+    fontWeight: '600',
+    textAlign: 'center',
   },
-  reloadText: { color: colors.accent, fontSize: 18, fontWeight: '700' },
-  error: { color: colors.danger, paddingHorizontal: 16, paddingTop: 8 },
+  search: {
+    marginHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.text,
+  },
+  center: { alignItems: 'center', gap: 12, padding: 24 },
+  error: { color: colors.danger, textAlign: 'center' },
+  retry: { borderWidth: 1, borderColor: colors.accent, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
+  retryText: { color: colors.accent, fontWeight: '700' },
   grid: { padding: 16, gap: 12, flexGrow: 1 },
   row: { gap: 12 },
   card: {

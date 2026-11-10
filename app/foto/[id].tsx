@@ -13,10 +13,9 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Chip } from '@/components/Chip';
 import { PhotoImage } from '@/components/PhotoImage';
 import { colors } from '@/constants/theme';
-import { useAuth } from '@/context/AuthContext';
 import { useAlbums } from '@/hooks/useAlbums';
 import { usePhoto } from '@/hooks/usePhoto';
-import { uploadPhotoById } from '@/services/cloudPhotos';
+import { useSync } from '@/hooks/useSync';
 
 const headerOptions = {
   headerShown: true,
@@ -31,8 +30,7 @@ export default function FotoDetalleScreen() {
   const id = Number(params.id);
   const { photo, isLoading, updateNote, toggleFavorite, moveToAlbum, remove } = usePhoto(id);
   const { albums } = useAlbums();
-  const { session } = useAuth();
-  const [uploading, setUploading] = useState(false);
+  const sync = useSync();
 
   if (isLoading) {
     return (
@@ -55,22 +53,9 @@ export default function FotoDetalleScreen() {
     );
   }
 
-  const handleUpload = async () => {
-    if (!session) return;
-    setUploading(true);
-    try {
-      await uploadPhotoById(photo.id, session.user.id);
-      Alert.alert('Listo', 'La foto quedó guardada en la nube.');
-    } catch (e) {
-      Alert.alert('No se pudo subir', e instanceof Error ? e.message : String(e));
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleDelete = () => {
     const message = photo.remotePath
-      ? 'Se borrará del teléfono y de la nube. No se puede deshacer.'
+      ? 'Se borrará de este teléfono, de la nube y de tus otros teléfonos (al sincronizar). No se puede deshacer.'
       : 'No se puede deshacer.';
     Alert.alert('¿Eliminar esta foto?', message, [
       { text: 'Cancelar', style: 'cancel' },
@@ -140,22 +125,13 @@ export default function FotoDetalleScreen() {
 
       <View style={styles.section}>
         <Text style={styles.label}>Nube</Text>
+        {/* Semana 9: ya no hay subida manual; cada cambio se sincroniza solo */}
         {photo.synced ? (
-          <Text style={styles.cloudOk}>☁️ Subida a la nube</Text>
+          <Text style={styles.cloudOk}>☁️ Sincronizada</Text>
         ) : (
-          <Pressable
-            onPress={handleUpload}
-            disabled={uploading}
-            style={[styles.button, styles.cloudButton, uploading && { opacity: 0.6 }]}
-          >
-            {uploading ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={styles.buttonText}>
-                {photo.remotePath ? '☁️ Subir cambios' : '☁️ Subir a la nube'}
-              </Text>
-            )}
-          </Pressable>
+          <Text style={styles.cloudPending}>
+            {sync.isOnline ? '⏳ Pendiente: se subirá en unos segundos' : '⏳ Pendiente: se subirá cuando vuelva la red'}
+          </Text>
         )}
       </View>
 
@@ -229,8 +205,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   buttonText: { color: '#0a0a0a', fontWeight: '700' },
-  cloudButton: { alignSelf: 'stretch', alignItems: 'center' },
   cloudOk: { color: colors.accent, fontWeight: '600' },
+  cloudPending: { color: colors.warning, fontWeight: '600' },
   deleteButton: { alignSelf: 'stretch', alignItems: 'center', backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
   deleteText: { color: colors.danger, fontWeight: '700' },
 });
