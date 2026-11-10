@@ -52,3 +52,40 @@ create policy "actualizar las mías" on public.photos
 -- Trabajo para la casa (C4): la pestaña Nube recibe los cambios en tiempo real.
 -- Las políticas RLS también aplican a lo que llega por el canal.
 alter publication supabase_realtime add table public.photos;
+
+-- ===========================================================================
+-- GeoCam · Semana 9 · Sincronización en dos sentidos (ejecutar en el SQL Editor)
+-- ===========================================================================
+
+-- T1. Reloj del servidor: cuándo llegó cada cambio a Supabase (cursor de bajada).
+-- updated_at lo escribe el teléfono y decide conflictos; server_updated_at lo escribe
+-- PostgreSQL y sirve para pedir "lo que llegó después de X".
+alter table public.photos
+  add column if not exists server_updated_at timestamptz not null default now();
+
+create or replace function public.touch_server_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.server_updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists photos_touch_server_updated_at on public.photos;
+create trigger photos_touch_server_updated_at
+  before insert or update on public.photos
+  for each row execute function public.touch_server_updated_at();
+
+create index if not exists photos_user_server_updated_idx
+  on public.photos (user_id, server_updated_at);
+
+-- La política de update que pide el T1 ("editar las mías") ya existe desde el C2 de la
+-- Semana 8 con el nombre "actualizar las mías": no se vuelve a crear.
+
+-- C1. Borrado lógico: borrar = marcar. La fila queda para que los demás teléfonos se enteren.
+alter table public.photos
+  add column if not exists deleted_at timestamptz;
+
+-- C2. El feed de la pestaña Nube pagina por created_at (cursor)
+create index if not exists photos_user_created_idx
+  on public.photos (user_id, created_at desc);

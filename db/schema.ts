@@ -43,6 +43,11 @@ export const photos = sqliteTable(
     // id de Supabase Auth del dueño. Opcional por la misma razón que las anteriores;
     // las fotos viejas sin dueño se asignan con photosRepo.claimUnowned al iniciar sesión.
     ownerId: text('owner_id'),
+
+    // --- Semana 9 (C1): borrado lógico ---
+    // Borrar = marcar con la hora. La fila se conserva para que push suba la marca y pull la
+    // aplique en los demás teléfonos; la UI filtra las marcadas.
+    deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
   },
   // Las listas se ordenan por fecha descendente: el índice evita ordenar toda la tabla
   (t) => [
@@ -51,6 +56,12 @@ export const photos = sqliteTable(
     index('photos_owner_id_idx').on(t.ownerId),
   ]
 );
+
+// --- Semana 9 (T3): datos de la sincronización, p. ej. el cursor de bajada por usuario ---
+export const syncMeta = sqliteTable('sync_meta', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+});
 
 export type Album = typeof albums.$inferSelect;
 export type NewAlbum = typeof albums.$inferInsert;
