@@ -1,96 +1,64 @@
 # Registro de Auditoría de IA (AI-LOG)
 
 **Estudiante(s):** Luis Nuñez, Amand Herrera
-**Semana:** 8
-**Proyecto:** GeoCam en la nube – Taller Integrador 2
-**Herramienta:** Claude (claude.ai, con acceso al repositorio de GitHub)
+**Semana:** 9
+**Proyecto:** GeoCam sincronizada – Taller Integrador 2
+**Herramienta:** Claude Code (asistente de programación con IA, con acceso al repositorio)
 
-> Registros anteriores: [Semana 6](docs/ai-log/AI-LOG-semana-6.md) · [Semana 7](docs/ai-log/AI-LOG-semana-7.md)
+> Registros anteriores: [Semana 6](docs/ai-log/AI-LOG-semana-6.md) · [Semana 7](docs/ai-log/AI-LOG-semana-7.md) ·
+> [Semana 8](docs/ai-log/AI-LOG-semana-8.md)
 
 ## 1. Prompts Utilizados
 
-La clase no se dictó y el docente envió la guía en PDF. Se trabajó en una sola conversación, adjuntando la guía:
-
-- *"Mi profesor me dio esta guía pero no entiendo qué hay que hacer … indícame qué me pide hacer mi profesor."*
-  La IA separó el **taller en clase (T1–T6)** del **trabajo para la casa (C1–C7)** y aclaró que se entregan los dos.
-- *"Dime qué hago primero, paso a paso."* A partir de aquí la IA trabajó por pasos: escribía el código de una
-  tarea, lo subía al repositorio y daba instrucciones para probarlo en el iPhone. Ninguna tarea avanzaba sin la
-  prueba en el teléfono de la anterior.
-- Se le pidió traer la Semana 7 del repositorio del compañero (`Amand-H/GeoCam_amandH_luifer`) al repositorio
-  propio (`lnunez01/geocam`). Se hizo con un *fast-forward* porque partía del mismo commit de la Semana 6.
-- Durante las pruebas se le enviaron capturas: el panel de Supabase, la terminal de VS Code y dos errores en el
-  teléfono (puntos 3.1 y 3.2).
+- *"Sigamos con la semana 9, dime qué necesito o tú puedes hacer todo"*, adjuntando la guía en PDF.
+  La IA escribió el código del taller (T1–T6) y del trabajo para la casa (C1–C5, C7). Las pruebas en los dos
+  teléfonos, el GIF y la matriz de pruebas (C6) quedaron para el equipo.
+- Antes se le pidió verificar la Semana 8 contra su guía; de esa revisión salieron dos arreglos que se
+  hicieron al empezar la Semana 9 (lockfile desincronizado y errores de lint en `app/_layout.tsx`).
 
 ## 2. Código Generado vs. Código Modificado
 
-- **¿Qué generó la IA?:**
-  - T1: `lib/secureStorage.ts` (sesión por fragmentos en SecureStore), `lib/supabase.ts`, `.env.example` y `.env`
-    en `.gitignore`.
-  - T2: `context/AuthContext.tsx`, `app/login.tsx`, `Stack.Protected` en `app/_layout.tsx`, redirección en
-    `app/index.tsx` y botón **Salir** en la pestaña Fotos.
-  - T4: columnas `clientId`, `updatedAt`, `remotePath`, `syncedAt` y los métodos `ensureSyncFields`, `markSynced`.
-  - T5 y C1–C4: `services/cloudPhotos.ts`, `hooks/useCloudSync.ts`, `hooks/useCloudPhotos.ts`, `app/(tabs)/nube.tsx`.
-  - C5: columna `ownerId`, filtro por usuario en todas las consultas de fotos y `claimUnowned`.
-  - `supabase/schema.sql` con todo el SQL remoto, y este README / AI-LOG.
-- **¿Qué hicimos nosotros?:** crear el proyecto de Supabase, el `.env`, ejecutar el SQL en el panel, instalar las
-  librerías con `npx expo install`, **generar las migraciones con `npm run db:generate`** (la IA no podía instalar
-  paquetes en su entorno) y todas las pruebas en el iPhone.
-- **¿Qué se cambió respecto al código de la guía?:**
-  - **Subida con `upsert` en lugar de `insert` (C2).** Con el `insert` de la guía, repetir la subida falla por
-    `client_id` único. Se cambió a `upsert(..., { onConflict: 'client_id' })`: la primera vez inserta y las
-    siguientes actualizan la misma fila (por ejemplo, una nota editada). Si el archivo ya existe en el bucket
-    (`409` / *already exists*) se reutiliza. Si el archivo se subió en ese intento y la fila falla, se borra del
-    bucket antes de reportar el error.
-  - **Política `actualizar las mías`.** El SQL de la guía no tiene política `UPDATE` en `photos`, y sin ella el
-    `upsert` falla por RLS. Se agregó en `supabase/schema.sql`.
-  - **Pendiente incluye ediciones.** La guía define "pendiente" como `syncedAt` vacío o anterior a `updatedAt`;
-    `pendingUploads()` usa esa misma regla, así que **Sincronizar** también sube notas y favoritas editadas.
-    En el detalle el botón cambia a **"Subir cambios"**.
-  - **UUID fuera de `schema.ts`.** La guía pone `$defaultFn(() => Crypto.randomUUID())` en el esquema. Como
-    `drizzle-kit` lee `schema.ts` desde Node, se decidió no importar un módulo nativo de Expo ahí; el `clientId`
-    lo genera `photosRepo.create`. Fue una precaución: no se probó la versión de la guía.
-  - **Login con `StyleSheet`, no NativeWind.** El proyecto nunca usó NativeWind (todas las pantallas usan
-    `StyleSheet` y `constants/theme.ts`); se mantuvo la consistencia en lugar de instalarlo solo para una pantalla.
-  - **Errores de Auth en español** (`translateError` en `AuthContext`).
+- **¿Qué generó la IA?:** `services/sync.ts` (pull, push, `remoteWins`, purga de borrados), `lib/queryClient.ts`,
+  `hooks/useSync.ts`, `hooks/useCloudFeed.ts`, la pestaña Nube con `useInfiniteQuery`, la pantalla
+  `app/sincronizacion.tsx`, la migración 0005 y el SQL de Supabase.
+- **¿Qué se cambió respecto al código de apoyo de la guía?:**
+  - **Dos ciclos de sincronización a la vez.** `invalidateQueries` cancela la consulta en curso y lanza otra, pero
+    la función de sincronización no se puede abortar: podían correr dos `push` al mismo tiempo. `syncAll` ahora
+    devuelve el ciclo que ya está en marcha en vez de empezar otro.
+  - **Una fila que no se puede bajar trababa todo.** En el código de la guía, si el archivo de una foto no está en el
+    bucket, `pull` lanza el error, el cursor no avanza y cada ciclo falla en la misma fila. Ahora: sin red se corta
+    y se reintenta; otro error se registra y esa fila se salta.
+  - **C5 (errores por foto):** el `push` de la guía se detiene en la primera foto que falla. Ahora cada foto va en su
+    propio `try/catch`, la que falla sigue pendiente y el resultado cuenta cuántas fallaron. Sin red sí se corta,
+    porque las demás también fallarían.
+  - **Huérfanos (C2 de la Semana 8):** si el archivo sube y el `upsert` falla, se borra el archivo recién subido.
+  - **Borrado lógico (C1):** una foto que nunca llegó a la nube se borra de verdad (nadie más la conoce); las demás
+    se marcan con `deletedAt` + `updatedAt`. Los archivos se borran solo cuando la marca ya está sincronizada, y la
+    fila local queda como lápida (`uri` vacía) para que no vuelva a bajar.
+  - **La caché persistida (C3) usa `expo-sqlite/kv-store`** en vez de instalar AsyncStorage: tiene la misma API y
+    el proyecto ya usa expo-sqlite. Solo se persiste el feed de la Nube, no la consulta de sincronización.
+  - **URLs firmadas de 7 días** en el feed: con 1 hora, la caché persistida mostraba imágenes rotas sin conexión.
+  - **Las pantallas ya no importan Drizzle:** las migraciones pasaron a `hooks/useDatabase.ts`. De paso se
+    corrigieron los dos errores de lint (`setState` síncrono dentro de un efecto).
+  - **Se actualizó a Expo SDK 58**, porque Expo Go de iOS ya no abría el SDK 57.
 
 ## 3. Alucinaciones o Errores Detectados
 
-1. **`JSON Parse error: Unexpected character: <` al iniciar sesión.** La app recibía una página HTML en lugar de
-   JSON: la URL del `.env` no era la de la API del proyecto. La IA la había transcrito de una captura de
-   pantalla, y por eso recomendó copiarla con el botón **Copy** del panel. Tras corregirla y reiniciar con
-   `npx expo start -c`, funcionó. Lección: una llave o URL nunca se copia "a ojo".
-2. **"Correo o contraseña incorrectos" al crear la cuenta.** Ese mensaje solo lo produce `signInWithPassword`:
-   se estaba tocando el botón verde **Iniciar sesión** en vez del texto **Crear cuenta**. Se verificó en
-   *Authentication → Users* que la lista estaba vacía y el registro funcionó con el botón correcto.
-3. **Realtime con filtro `user_id=eq.…` no avisa de los borrados.** La primera versión de `useCloudPhotos`
-   filtraba el canal por `user_id`, pero Supabase no permite filtrar eventos `DELETE` (solo traen la llave
-   primaria), así que la pestaña Nube no se habría enterado de una foto borrada. Se quitó el filtro: RLS aplica
-   al canal y la consulta de recarga solo devuelve las filas propias.
-4. **Borrado a medias (C3).** Borrar primero la copia local y luego la remota deja la foto en la nube si no hay
-   internet. Se invirtió el orden: comprobar conexión → borrar fila remota → borrar archivo del bucket → borrar
-   la copia local. Si cualquier paso remoto falla, se lanza el error y la foto local se conserva.
-5. **`markSynced` no debe tocar `updatedAt`** (lo advierte la guía): si lo hiciera, la foto quedaría pendiente
-   para siempre. Al contrario, `photosRepo.update` ahora siempre escribe `updatedAt`.
-6. **Fotos sin dueño tras la migración `0004` (C5).** Las fotos viejas quedan con `owner_id` vacío y, con el
-   filtro nuevo, habrían desaparecido. `claimUnowned` las asigna al iniciar sesión: las ya subidas al usuario
-   de su carpeta en el bucket (`<userId>/…`) y el resto a quien inicia sesión.
-7. **`npm` sin red en el entorno de la IA.** No pudo ejecutar `npx tsc --noEmit` ni `npm run db:generate`;
-   por eso las migraciones `0003` y `0004` las generamos nosotros y toda la verificación se hizo en el teléfono.
-8. **`npx expo start` volvió a reescribir `tsconfig.json`** (igual que en la Semana 7). Se revirtió con
-   `git restore tsconfig.json` y no entró en ningún commit.
-9. **Errores típicos de la tabla de la guía:** no apareció ninguno (secret key en la app, variables sin
-   `EXPO_PUBLIC_`, `AsyncStorage`, `detectSessionInUrl: true`, API v1, `router.replace` tras el login, `Blob` o
-   `FormData`, `using (true)` en escrituras, desactivar RLS, canal sin `removeChannel`, paquetes de Next.js).
-   Se revisó con `git grep` sobre el código.
+- **"TanStack Query sincroniza la base de datos offline":** no lo hace. Solo decide cuándo ejecutar `syncAll`
+  (al reconectar, al volver a primer plano, al invalidar) y la reintenta; el qué (cursor, comparación, upsert,
+  borrados) es diseño propio en `services/sync.ts`.
+- **API de la versión 5:** se usó `useQuery({ queryKey, queryFn })`, `gcTime` (no `cacheTime`),
+  `status === 'pending'` (no `'loading'`) e `initialPageParam` en `useInfiniteQuery`, que es obligatorio.
+- **`window.addEventListener('online')`** no existe en React Native: la red se detecta con
+  `onlineManager.setEventListener` y `expo-network`.
+- **La política de update del T1** ya existía desde la Semana 8 con otro nombre ("actualizar las mías"). Volver a
+  crearla con el SQL de la guía habría fallado o dejado dos políticas iguales; el SQL del repositorio la omite.
+- **`refetch()` en `onRefresh`:** TypeScript rechazó pasar `() => feed.refetch()` a `RefreshControl` porque
+  devuelve una promesa con datos; se envolvió en una función que no devuelve nada.
 
-## 4. Verificación (iPhone con Expo Go)
+## 4. Verificación
 
-- T2: sin sesión abre el login; registro, cierre de la app con la sesión intacta, **Salir** vuelve al login.
-- T5/T6: foto subida a `geocam/<userId>/<clientId>.jpg` (peso mayor a 0 bytes) y su fila en `photos`.
-- C1/C2: **Sincronizar** muestra el avance; al repetirlo dice "Todo al día"; 4 filas con `client_id` distintos;
-  la nota editada ("Pc") actualizó la misma fila.
-- C3: la foto borrada desaparece de la tabla y del bucket.
-- C4: la pestaña Nube muestra las fotos con URL firmada; al cambiar `favorite` en el panel aparece la ★ sola.
-- C5: con una segunda cuenta en el mismo teléfono, Fotos, Mapa y Nube aparecen vacías; al volver a la cuenta
-  principal sus fotos siguen ahí y la de la segunda cuenta no.
-- C6: ver la sección "Auditoría de credenciales" del [README](README.md).
+- `npx tsc --noEmit` y `npx expo lint`: sin errores.
+- `npm run db:generate`: migración `drizzle/0005_*.sql` con `sync_meta` y `deleted_at`.
+- `npx expo export --platform ios`: el bundle compila.
+- Pruebas en dos teléfonos: ver la matriz de pruebas en el README. _Completar con los resultados obtenidos._
