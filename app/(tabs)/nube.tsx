@@ -62,7 +62,7 @@ export default function NubeScreen() {
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={reload} tintColor={colors.accent} />}
         ListEmptyComponent={
-          isLoading ? null : (
+          isLoading ? undefined : (
             <Text style={styles.empty}>
               Aún no hay fotos en la nube. Súbelas desde la pestaña Fotos con «☁️ Sincronizar».
             </Text>
