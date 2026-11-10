@@ -15,6 +15,18 @@ export async function persistPhoto(cacheUri: string): Promise<string> {
   return destination.uri;
 }
 
+/**
+ * Descarga el archivo de una foto que vino de la nube (Semana 9). Se nombra con su clientId,
+ * así que si ya se descargó antes no se vuelve a bajar. `url` es una URL firmada: el bucket es privado.
+ */
+export async function downloadPhotoFile(url: string, clientId: string): Promise<string> {
+  if (!photosDir.exists) photosDir.create({ intermediates: true, idempotent: true });
+  const destination = new File(photosDir, `${clientId}.jpg`);
+  if (destination.exists) return destination.uri;
+  const file = await File.downloadFileAsync(url, destination);
+  return file.uri;
+}
+
 /** Borra el archivo si existe. Tolera URIs que ya no existen (p. ej. fotos antiguas en caché). */
 export function deletePhotoFile(uri: string): void {
   try {
