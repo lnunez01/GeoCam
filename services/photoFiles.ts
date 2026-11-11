@@ -27,6 +27,24 @@ export async function downloadPhotoFile(url: string, clientId: string): Promise<
   return file.uri;
 }
 
+/**
+ * Ubica el archivo de una foto. En iOS la ruta absoluta de la carpeta de documentos cambia
+ * cuando se reinstala o actualiza la app (p. ej. Expo Go al pasar de SDK 57 a 58): el archivo
+ * sigue ahí, pero la URI guardada en SQLite apunta a la carpeta vieja.
+ * Devuelve la URI vigente, o null si el archivo de verdad no está en el teléfono.
+ */
+export function locatePhotoFile(uri: string): string | null {
+  try {
+    if (new File(uri).exists) return uri;
+    const name = uri.split('/').pop();
+    if (!name) return null;
+    const moved = new File(photosDir, name);
+    return moved.exists ? moved.uri : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Borra el archivo si existe. Tolera URIs que ya no existen (p. ej. fotos antiguas en caché). */
 export function deletePhotoFile(uri: string): void {
   try {

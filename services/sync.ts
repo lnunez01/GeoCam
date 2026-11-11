@@ -12,7 +12,7 @@ import {
   storagePathFor,
   type RemotePhoto,
 } from '@/services/cloudPhotos';
-import { deletePhotoFile, downloadPhotoFile } from '@/services/photoFiles';
+import { deletePhotoFile, downloadPhotoFile, locatePhotoFile } from '@/services/photoFiles';
 
 const PULL_LIMIT = 200;
 
@@ -208,6 +208,41 @@ async function purgeDeleted(userId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// 4. Archivos locales perdidos
+// ---------------------------------------------------------------------------
+
+/**
+ * Sin red, al abrir la app: corrige las URIs cuyo archivo sigue en la carpeta de fotos pero con
+ * otra ruta absoluta (iOS cambia la ruta de documentos al actualizar la app). Devuelve cuántas cambió.
+ */
+export function relocatePhotoFiles(): number {
+  let moved = 0;
+  for (const photo of photosRepo.listWithFiles()) {
+    const current = locatePhotoFile(photo.uri);
+    if (current && current !== photo.uri) {
+      photosRepo.setUri(photo.id, current);
+      moved++;
+    }
+  }
+  return moved;
+}
+
+/** Con red, en cada ciclo: si el archivo de una foto ya subida no está en el teléfono, se vuelve a bajar. */
+async function restoreMissingFiles(userId: string): Promise<void> {
+  for (const photo of photosRepo.listWithFiles()) {
+    if (photo.ownerId !== userId || !photo.remotePath || !photo.clientId) continue;
+    if (locatePhotoFile(photo.uri)) continue;
+    try {
+      const uri = await downloadPhotoFile(await signedUrl(photo.remotePath), photo.clientId);
+      photosRepo.setUri(photo.id, uri);
+    } catch (e) {
+      if (isNetworkError(messageOf(e))) throw e;
+      if (__DEV__) console.warn(`[sync] no se pudo recuperar el archivo de ${photo.id}`, e);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Un ciclo completo. Primero bajar, después subir.
 // ---------------------------------------------------------------------------
 let running: Promise<SyncResult> | null = null;
@@ -222,6 +257,7 @@ export function syncAll(userId: string): Promise<SyncResult> {
   running ??= (async () => {
     try {
       const pulled = await pull(userId);
+      await restoreMissingFiles(userId);
       const { pushed, failed, lastError } = await push(userId);
       await purgeDeleted(userId);
       const result: SyncResult = { pulled, pushed, failed, lastError, finishedAt: Date.now() };

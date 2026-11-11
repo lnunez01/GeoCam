@@ -3,6 +3,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from '@/db/client';
 import { photosRepo } from '@/db/repositories/photos';
 import migrations from '@/drizzle/migrations';
+import { relocatePhotoFiles } from '@/services/sync';
 
 /**
  * Prepara SQLite antes de montar cualquier pantalla: aplica las migraciones de drizzle/ y
@@ -20,6 +21,8 @@ export function useDatabase() {
       .then(() => {
         const filled = photosRepo.ensureSyncFields();
         if (__DEV__ && filled > 0) console.log(`[db] ${filled} fotos recibieron clientId`);
+        const moved = relocatePhotoFiles();
+        if (__DEV__ && moved > 0) console.log(`[db] ${moved} fotos con la ruta corregida`);
       })
       .catch((e: unknown) => {
         if (__DEV__) console.warn('[db] ensureSyncFields falló', e);

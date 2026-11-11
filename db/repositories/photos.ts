@@ -189,6 +189,16 @@ export const photosRepo = {
     return db.delete(photos).where(eq(photos.id, id)).run();
   },
 
+  /** Fotos con archivo en el teléfono (de todos los usuarios), para revisar que sus URIs sigan vigentes. */
+  listWithFiles() {
+    return db.select().from(photos).where(and(visible, not(eq(photos.uri, '')))).all();
+  },
+
+  /** Corrige la URI del archivo. NO toca updatedAt: no es un cambio del usuario y no debe quedar pendiente. */
+  setUri(id: number, uri: string) {
+    return db.update(photos).set({ uri }).where(eq(photos.id, id)).run();
+  },
+
   /** Fotos visibles del usuario (para borrarlas todas al agitar el teléfono). */
   listVisible(ownerId: string) {
     return db.select().from(photos).where(and(ownedBy(ownerId), visible)).all();
