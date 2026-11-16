@@ -21,6 +21,8 @@ export interface GeoPhoto {
   createdAt: number; // ms
   note: string | null;
   favorite: boolean;
+  /** Semana 10: descripción sugerida por la IA (editable). */
+  aiDescription: string | null;
   albumId: number | null;
   albumName: string | null;
   /** UUID que identifica la misma foto en el teléfono y en la nube. */

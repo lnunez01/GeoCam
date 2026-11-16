@@ -26,6 +26,7 @@ interface RemotePhoto {
   updated_at: string; // reloj del teléfono: decide conflictos
   server_updated_at: string; // reloj del servidor: cursor de bajada
   deleted_at: string | null; // C1: borrado lógico ("lápida")
+  ai_description: string | null; // Semana 10 (T5): descripción de IA
 }
 
 export interface SyncResult {
@@ -109,6 +110,7 @@ async function applyRemoteRow(remote: RemotePhoto, userId: string): Promise<bool
         longitude: remote.longitude,
         note: remote.note,
         favorite: remote.favorite,
+        aiDescription: remote.ai_description,
         source: remote.source,
         createdAt: new Date(remote.taken_at),
         updatedAt: remoteUpdatedAt,
@@ -125,6 +127,7 @@ async function applyRemoteRow(remote: RemotePhoto, userId: string): Promise<bool
     photosRepo.applyRemote(local.id, userId, {
       note: remote.note,
       favorite: remote.favorite,
+      aiDescription: remote.ai_description,
       updatedAt: remoteUpdatedAt,
       syncedAt: remoteUpdatedAt,
     });
@@ -199,6 +202,7 @@ async function pushOne(photo: PendingRow, userId: string, markAsSynced = true): 
       longitude: photo.longitude,
       note: photo.note,
       favorite: photo.favorite,
+      ai_description: photo.aiDescription, // Semana 10 (T5)
       source: photo.source,
       taken_at: photo.createdAt.toISOString(),
       updated_at: uploadedVersion.toISOString(),

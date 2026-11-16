@@ -4,7 +4,7 @@ import { db } from '@/db/client';
 import { albums, photos, type NewPhoto } from '@/db/schema';
 import type { PhotoFilters } from '@/types/geo';
 
-export type PhotoChanges = Partial<Pick<NewPhoto, 'note' | 'favorite' | 'albumId'>>;
+export type PhotoChanges = Partial<Pick<NewPhoto, 'note' | 'favorite' | 'albumId' | 'aiDescription'>>;
 
 /** Nunca subida, o editada después de la última sincronización. */
 function isPending() {
@@ -113,6 +113,14 @@ export const photosRepo = {
   },
 
   /**
+   * Semana 10 (T5): guarda la descripción de IA (o la versión que editó el usuario).
+   * Pasa por update(), que escribe updatedAt: la foto queda pendiente y la descripción se sube.
+   */
+  setDescription(id: number, ownerId: string, aiDescription: string | null) {
+    return this.update(id, ownerId, { aiDescription });
+  },
+
+  /**
    * Solo registra la sincronización. syncedAt = la versión (updatedAt) que se subió, nunca "ahora":
    * si el usuario editó durante la subida, updatedAt > syncedAt y la foto sigue pendiente.
    * No toca updatedAt: si lo hiciera, la foto nunca quedaría al día.
@@ -150,7 +158,13 @@ export const photosRepo = {
   applyRemote(
     id: number,
     ownerId: string,
-    changes: { note: string | null; favorite: boolean; updatedAt: Date; syncedAt: Date }
+    changes: {
+      note: string | null;
+      favorite: boolean;
+      aiDescription: string | null;
+      updatedAt: Date;
+      syncedAt: Date;
+    }
   ) {
     return db.update(photos).set(changes).where(ownPhoto(id, ownerId)).run();
   },

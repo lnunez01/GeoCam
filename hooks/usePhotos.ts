@@ -33,6 +33,7 @@ export function toGeoPhoto(row: PhotoRow): GeoPhoto {
     createdAt,
     note: row.note,
     favorite: row.favorite,
+    aiDescription: row.aiDescription,
     albumId: row.albumId,
     albumName: row.albumName,
     clientId: row.clientId,

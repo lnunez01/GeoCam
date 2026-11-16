@@ -53,6 +53,8 @@ export const photos = sqliteTable(
     // Semana 9 (C1): borrado lógico. La fila queda marcada hasta que la marca llega a la nube;
     // después se borra de verdad (fila + archivo). Ninguna consulta de la UI muestra filas marcadas.
     deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+    // Semana 10 (T3): descripción sugerida por la IA y editable por el usuario. Viaja con la sincronización.
+    aiDescription: text('ai_description'),
   },
   // Las listas se ordenan por fecha descendente: el índice evita ordenar toda la tabla
   (t) => [index('photos_created_at_idx').on(t.createdAt)]
@@ -71,3 +73,22 @@ export type Album = typeof albums.$inferSelect;
 export type NewAlbum = typeof albums.$inferInsert;
 export type Photo = typeof photos.$inferSelect;
 export type NewPhoto = typeof photos.$inferInsert;
+
+// Semana 10 (C1): historial del chat del Tutor IA. Cada fila es un UIMessage completo en JSON
+// (texto, fotos y demás partes), en el orden en que se mostró. Solo vive en este teléfono.
+export const chatMessages = sqliteTable(
+  'chat_messages',
+  {
+    id: text('id').primaryKey(), // id del UIMessage: guardar dos veces el mismo mensaje lo actualiza (upsert)
+    ownerId: text('owner_id').notNull(),
+    conversationId: text('conversation_id').notNull(),
+    position: integer('position').notNull(),
+    message: text('message').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+  },
+  (t) => [index('chat_messages_conversation_idx').on(t.ownerId, t.conversationId, t.position)]
+);
+
+export type ChatMessageRow = typeof chatMessages.$inferSelect;
