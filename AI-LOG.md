@@ -48,6 +48,12 @@
   Los tutoriales viejos y varias respuestas de IA proponen la forma de las versiones 4 y 5.
 - **La guía pide Expo Go con SDK 57**, pero el proyecto ya está en SDK 58 (Expo Go de iOS solo abre la última). Se
   instaló `expo-image-manipulator@~58` y no la versión 57 del ejemplo.
+- **Error real al probar: el modelo de la guía estaba saturado.** La primera pregunta al tutor falló con
+  *"El tutor no pudo responder"*. En *Edge Functions → tutor → Logs* el error real era
+  `AI_RetryError … AI_APICallError: This model is currently experiencing high demand` (HTTP 503) con
+  `gemini-3.8-flash`. No era un error del código ni de la key: Google estaba saturado. Se cambió el modelo con
+  `npx supabase secrets set GEMINI_MODEL=gemini-3.5-flash-lite` (sin tocar el código) y se agregó un mensaje
+  propio para el 503 en las tres funciones, porque el genérico no le decía al usuario que era temporal.
 - _Agregar aquí los errores que aparezcan al probar en el teléfono (al menos 2 son obligatorios en C6)._
 
 ## 4. Verificación

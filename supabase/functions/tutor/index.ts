@@ -96,6 +96,10 @@ export default {
           if (APICallError.isInstance(real) && real.statusCode === 429) {
             return 'Se agotó la cuota gratuita de Gemini. Espera un minuto e intenta de nuevo.';
           }
+          // 503: el modelo está saturado en Google ("high demand"). Es temporal y no es culpa del usuario.
+          if (APICallError.isInstance(real) && real.statusCode === 503) {
+            return 'Gemini está saturado en este momento. Intenta de nuevo en unos segundos.';
+          }
           return 'El tutor no pudo responder. Intenta de nuevo.';
         },
       }),

@@ -66,6 +66,10 @@ export default {
       if (APICallError.isInstance(real) && real.statusCode === 429) {
         return json({ error: 'Se agotó la cuota gratuita de Gemini. Espera un minuto.' }, 429);
       }
+      // 503: el modelo está saturado en Google ("high demand"). Es temporal.
+      if (APICallError.isInstance(real) && real.statusCode === 503) {
+        return json({ error: 'Gemini está saturado en este momento. Intenta de nuevo en unos segundos.' }, 503);
+      }
       return json({ error: 'No se pudo describir la foto. Intenta de nuevo.' }, 502);
     }
   }),
