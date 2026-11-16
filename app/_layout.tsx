@@ -1,3 +1,4 @@
+import '../polyfills'; // Semana 10: debe ser la PRIMERA línea (AI SDK necesita structuredClone y streams de texto)
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -37,6 +38,8 @@ function RootNavigator() {
             headerTintColor: colors.text,
           }}
         />
+        {/* Semana 10 (C2): perfil del Tutor IA */}
+        <Stack.Screen name="perfil" options={{ headerShown: true, title: 'Perfil del tutor' }} />
       </Stack.Protected>
       <Stack.Protected guard={!session}>
         <Stack.Screen name="login" />

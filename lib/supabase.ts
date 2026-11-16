@@ -12,6 +12,10 @@ if (!supabaseUrl || !supabaseKey) {
   );
 }
 
+// Semana 10: el transporte del chat llama a las Edge Functions con fetch propio y necesita estos valores
+export const SUPABASE_URL: string = supabaseUrl;
+export const SUPABASE_PUBLISHABLE_KEY: string = supabaseKey;
+
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     storage: secureStorage,
