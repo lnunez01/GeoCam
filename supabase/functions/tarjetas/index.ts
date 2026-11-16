@@ -9,12 +9,22 @@ const google = createGoogleGenerativeAI({ apiKey: Deno.env.get('GEMINI_API_KEY')
 const MODELO = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.8-flash';
 const LIMITE_DIARIO = Number(Deno.env.get('LIMITE_DIARIO') ?? '20');
 
+// El esquema que se le pide al modelo es flexible a propósito: si se le exige "entre 3 y 5" y longitudes
+// máximas, basta con que Gemini devuelva 6 tarjetas o una respuesta larga para que toda la petición falle
+// (al probar pasó). Las reglas se aplican después, en el código.
 const Tarjetas = z.object({
   tarjetas: z
-    .array(z.object({ pregunta: z.string().min(1).max(200), respuesta: z.string().min(1).max(400) }))
-    .min(3)
-    .max(5),
+    .array(
+      z.object({
+        pregunta: z.string().describe('Pregunta corta de repaso'),
+        respuesta: z.string().describe('Respuesta de 1 o 2 frases'),
+      })
+    )
+    .describe('Entre 3 y 5 tarjetas'),
 });
+
+const recortar = (texto: string, max: number) =>
+  texto.trim().length > max ? `${texto.trim().slice(0, max - 1)}…` : texto.trim();
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -52,9 +62,17 @@ export default {
         temperature: 0.2, // extraer y resumir: respuestas estables
         maxRetries: 1,
       });
-      return json(output);
+      const tarjetas = output.tarjetas
+        .filter((t) => t.pregunta.trim() && t.respuesta.trim())
+        .slice(0, 5)
+        .map((t) => ({ pregunta: recortar(t.pregunta, 200), respuesta: recortar(t.respuesta, 400) }));
+      if (tarjetas.length === 0) {
+        return json({ error: 'La conversación es muy corta para hacer tarjetas. Pregunta algo más al tutor.' }, 422);
+      }
+      return json({ tarjetas });
     } catch (error) {
-      console.error(error);
+      // El motivo exacto queda en Edge Functions → tarjetas → Logs
+      console.error('[tarjetas] falló', error instanceof Error ? `${error.name}: ${error.message}` : error);
       const real = RetryError.isInstance(error) ? error.lastError : error;
       if (APICallError.isInstance(real) && real.statusCode === 429) {
         return json({ error: 'Se agotó la cuota gratuita de Gemini. Espera un minuto.' }, 429);
