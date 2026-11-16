@@ -1,10 +1,10 @@
 import '../polyfills'; // Semana 10: debe ser la PRIMERA línea (AI SDK necesita structuredClone y streams de texto)
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
-import { db } from '@/db/client';
+import { db, resetLocalDatabaseForDev } from '@/db/client';
 import migrations from '@/drizzle/migrations';
 import { colors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
@@ -62,6 +62,24 @@ export default function RootLayout() {
         <Text style={styles.error}>Error al preparar la base de datos: {error.message}</Text>
         {/* Drizzle envuelve el error real de SQLite en error.cause */}
         {error.cause instanceof Error && <Text style={styles.cause}>{error.cause.message}</Text>}
+        {/* Solo en desarrollo: una base creada con migraciones de otra rama no se puede migrar */}
+        {__DEV__ && (
+          <Pressable
+            onPress={() =>
+              Alert.alert(
+                '¿Borrar la base local?',
+                'Se borran los datos de este teléfono. Las fotos ya subidas vuelven a bajar de la nube al sincronizar; las que nunca se subieron y los álbumes se pierden.',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { text: 'Borrar y reiniciar', style: 'destructive', onPress: resetLocalDatabaseForDev },
+                ]
+              )
+            }
+            style={styles.resetButton}
+          >
+            <Text style={styles.resetText}>Borrar base local y reiniciar (desarrollo)</Text>
+          </Pressable>
+        )}
         <StatusBar style="light" />
       </View>
     );
@@ -95,5 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   error: { color: colors.danger, textAlign: 'center' },
+  resetButton: { marginTop: 24, borderWidth: 1, borderColor: colors.danger, borderRadius: 10, padding: 12 },
+  resetText: { color: colors.danger, fontWeight: '700' },
   cause: { color: colors.textMuted, textAlign: 'center', fontSize: 12, marginTop: 8 },
 });

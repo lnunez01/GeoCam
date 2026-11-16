@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/expo-sqlite';
-import { openDatabaseSync } from 'expo-sqlite';
+import { deleteDatabaseSync, openDatabaseSync } from 'expo-sqlite';
+import { DevSettings } from 'react-native';
 import * as schema from './schema';
 
 // enableChangeListener es lo que permite a useLiveQuery enterarse de los cambios
@@ -19,3 +20,16 @@ try {
 expoDb.execSync('PRAGMA foreign_keys = ON;');
 
 export const db = drizzle(expoDb, { schema });
+
+/**
+ * Solo desarrollo: borra la base local y recarga la app, que la vuelve a crear desde cero con las
+ * migraciones. Sirve cuando el teléfono tiene una base creada con migraciones de otra rama
+ * (p. ej. "table `sync_meta` already exists"). Las fotos ya subidas vuelven a bajar de la nube
+ * con la sincronización; lo que nunca se subió (y los álbumes) se pierde.
+ */
+export function resetLocalDatabaseForDev() {
+  if (!__DEV__) return;
+  expoDb.closeSync();
+  deleteDatabaseSync('geocam.db');
+  DevSettings.reload();
+}
