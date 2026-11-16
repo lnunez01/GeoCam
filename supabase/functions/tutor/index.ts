@@ -7,6 +7,7 @@ import {
   RetryError,
   convertToModelMessages,
   createUIMessageStreamResponse,
+  smoothStream,
   streamText,
   toUIMessageStream,
   type UIMessage,
@@ -84,6 +85,9 @@ export default {
       temperature: 0.4,
       maxRetries: 1,
       maxOutputTokens: 1024,
+      // Gemini manda la respuesta en pocos trozos grandes (al probar: 1397 caracteres en 6 partes).
+      // smoothStream los reparte palabra por palabra: se ve el streaming y da tiempo de pulsar ■.
+      experimental_transform: smoothStream({ delayInMs: 15, chunking: 'word' }),
     });
 
     return createUIMessageStreamResponse({

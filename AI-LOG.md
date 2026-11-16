@@ -54,6 +54,10 @@
   `gemini-3.8-flash`. No era un error del código ni de la key: Google estaba saturado. Se cambió el modelo con
   `npx supabase secrets set GEMINI_MODEL=gemini-3.5-flash-lite` (sin tocar el código) y se agregó un mensaje
   propio para el 503 en las tres funciones, porque el genérico no le decía al usuario que era temporal.
+- **"La respuesta llega toda de golpe"** no era el `fetch` equivocado (el transporte ya usaba `expo/fetch`). Se
+  midió con un registro de desarrollo: llegaba en 6 partes en ~0,9 s, porque `gemini-3.5-flash-lite` manda trozos
+  grandes y muy rápido. Se agregó `experimental_transform: smoothStream({ chunking: 'word' })` en la función
+  `tutor` para repartir cada trozo palabra por palabra.
 - _Agregar aquí los errores que aparezcan al probar en el teléfono (al menos 2 son obligatorios en C6)._
 
 ## 4. Verificación
