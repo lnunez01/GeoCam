@@ -7,7 +7,7 @@ Las filas marcadas _Pendiente_ se llenan al probar en el teléfono.
 | --- | --- | --- | --- | --- |
 | 1 | La key no está en la app | `npx expo export --platform ios` y buscar `AIza` en `dist/` | 0 resultados | ✅ 0 resultados (búsqueda en el bundle exportado) |
 | 2 | La key no está en el repositorio | `git grep -n AIza` y `git log --all -p \| grep -c AIza` | 0 resultados | _Pendiente_ |
-| 3 | Función sin token | `curl -i -X POST https://<ref>.supabase.co/functions/v1/tutor -d '{"messages":[]}'` (igual con `describir-foto` y `tarjetas`) | `401` | _Pendiente_ |
+| 3 | Función sin token | `curl -i -X POST https://<ref>.supabase.co/functions/v1/tutor -d '{"messages":[]}'` (igual con `describir-foto` y `tarjetas`) | `401` | ✅ `HTTP/1.1 401 Unauthorized`, `sb-error-code: UNAUTHORIZED_NO_AUTH_HEADER` ([captura](docs/screenshots/semana10-curl-401.png)) |
 | 4 | Streaming | Preguntar algo largo en Tutor IA | El texto aparece por partes, no de golpe | _Pendiente_ |
 | 5 | Detener | Pulsar ■ mientras responde | La respuesta se corta y queda guardada hasta ahí | _Pendiente_ |
 | 6 | Foto en el chat | Adjuntar una foto de código en papel | El tutor la explica; la burbuja muestra la foto | _Pendiente_ |
