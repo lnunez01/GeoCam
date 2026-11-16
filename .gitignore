@@ -44,3 +44,6 @@ yarn-error.*
 .env
 .env.*
 !.env.example
+
+# Supabase CLI: datos locales de `supabase link` (no se versionan)
+supabase/.temp/
