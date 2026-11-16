@@ -2,12 +2,114 @@
 
 Cámara que etiqueta cada foto con coordenadas GPS, reacciona al movimiento del teléfono y guarda
 todo en una base de datos local para funcionar sin conexión.
-Taller Integrador 2 · **Semana 6: Módulos Nativos y Sensores** · **Semana 7: Persistencia con Drizzle ORM + SQLite** · **Semana 8: Supabase (auth, Storage, RLS y Realtime)** · **Semana 9: Sincronización offline-first con TanStack Query**.
+Taller Integrador 2 · **Semana 6: Módulos Nativos y Sensores** · **Semana 7: Persistencia con Drizzle ORM + SQLite** · **Semana 8: Supabase (auth, Storage, RLS y Realtime)** · **Semana 9: Sincronización offline-first con TanStack Query** · **Semana 10: IA generativa multimodal (Asistente IA)**.
 
 **Integrantes:** Luis Nuñez, Amand Herrera
 
 Construida con **Expo SDK 58** (React Native 0.88, React 19.3), Expo Router y TypeScript estricto. Todo el acceso al hardware
 está encapsulado en Custom Hooks tipados (sin `any`) que exponen los errores como estado para la UI.
+
+## Semana 10 – IA generativa multimodal (Asistente IA)
+
+GeoCam ahora tiene un **Tutor IA** que responde en streaming y entiende fotos, y cada foto se puede **describir con
+IA**. La regla de la semana: **la app nunca habla con Gemini**. Habla con Edge Functions de Supabase que guardan la
+key como secreto y solo atienden a usuarios con sesión.
+
+| Chat con streaming y foto | Foto descrita con IA | Límite diario |
+| :---: | :---: | :---: |
+| ![Tutor IA](docs/screenshots/semana10-chat.png) | ![Describir con IA](docs/screenshots/semana10-describir.png) | ![Límite](docs/screenshots/semana10-limite.png) |
+
+### Arquitectura
+
+```mermaid
+flowchart LR
+    subgraph Tel["📱 GeoCam"]
+        Chat["Tutor IA<br/>useChat + DefaultChatTransport<br/>(fetch de expo/fetch)"]
+        Det["Detalle de foto<br/>✨ Describir con IA"]
+        SQL[("SQLite<br/>chat_messages · photos.ai_description")]
+    end
+    subgraph Sup["☁️ Supabase"]
+        T["Edge Function tutor<br/>streamText"]
+        D["Edge Function describir-foto<br/>generateText + Output.object"]
+        K["Edge Function tarjetas<br/>generateText + Output.object"]
+        U[("uso_ia<br/>RLS por usuario")]
+        S[["Secreto GEMINI_API_KEY"]]
+    end
+    G["Google Gemini"]
+    Chat -- "Bearer token + mensajes + perfil" --> T
+    Det -- "functions.invoke (foto 1024 px, JPEG 0.7)" --> D
+    Chat -- "functions.invoke (texto)" --> K
+    T & D & K -- "cuenta e inserta con el cliente del usuario" --> U
+    T & D & K -- "key leída de" --> S
+    T & D & K --> G
+    Chat <--> SQL
+    Det --> SQL
+```
+
+### Taller en clase y trabajo para la casa
+
+| Tarea | Implementación |
+| --- | --- |
+| T1. Edge Function `describir-foto` | [`supabase/functions/describir-foto`](supabase/functions/describir-foto/index.ts): recibe la foto como data URL JPEG y responde `{ descripcion }`. Usa el mismo secreto `GEMINI_API_KEY` |
+| T2. `services/vision.ts` | Reduce a 1024 px y JPEG 0.7 (`lib/foto.ts`) y llama con `supabase.functions.invoke` |
+| T3. Columna `ai_description` | Migración `0007` (ALTER TABLE) en SQLite y [`supabase/semana10.sql`](supabase/semana10.sql) en Supabase |
+| T4. Botón en el detalle | **✨ Describir con IA** con spinner; apagado y con aviso sin red |
+| T5. Sincronización | `photosRepo.setDescription` pasa por `update()` y cambia `updatedAt`; `push` y `pull` mapean `ai_description` |
+| T6. Sugerencia editable | La respuesta llena un editor y se guarda con *Guardar descripción*; aviso de que la foto se envía a Google |
+| C1. Historial persistente | Tabla `chat_messages` (un `UIMessage` en JSON por fila, upsert por id). Al abrir sigue donde iba; botón **Nueva** |
+| C2. Instrucciones con tus datos | Pantalla **Perfil** (nombre, tema, nivel). Viaja en el `body` del transporte; el servidor lo valida con zod y `.catch()` |
+| C3. Salida estructurada | Botón **Tarjetas**: función `tarjetas` con `Output.object` (3 a 5 tarjetas pregunta/respuesta) |
+| C4. Manejo de errores | Banner sin conexión, envío apagado, mensajes para sesión vencida (cierra la sesión), límite, cuota y red; **Reintentar** con `regenerate()` |
+| C5. Límite por usuario | Tabla `uso_ia` con RLS (ver e insertar lo propio, sin borrar). `LIMITE_DIARIO` (20 por defecto) cada 24 h |
+| C6. Bitácora y pruebas | [`AI-LOG.md`](AI-LOG.md) y [`PRUEBAS.md`](PRUEBAS.md) |
+
+### Configuración y despliegue
+
+1. **Key de Gemini:** créala en [Google AI Studio](https://aistudio.google.com) (*Get API key*). **No va en el `.env`
+   de la app** ni en el repositorio.
+2. **SQL:** ejecuta [`supabase/semana10.sql`](supabase/semana10.sql) en el SQL Editor.
+3. **Funciones y secreto** (Supabase CLI):
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <TU_REF>
+   npx supabase secrets set GEMINI_API_KEY=<tu key>
+   npx supabase functions deploy tutor
+   npx supabase functions deploy describir-foto
+   npx supabase functions deploy tarjetas
+   ```
+   Sin CLI: *Dashboard → Edge Functions → Deploy a new function → Via Editor*, una por función, y la key en
+   *Edge Functions → Secrets*.
+4. **Comprobar la seguridad:** `curl -i -X POST https://<TU_REF>.supabase.co/functions/v1/tutor -d '{"messages":[]}'`
+   debe responder **401**.
+5. `npm install` y `npx expo start -c`.
+
+### Debes poder explicar
+
+1. **¿Dónde está la key de Gemini y cómo lo demuestras?** Solo como secreto de Supabase (`GEMINI_API_KEY`), leído
+   con `Deno.env.get` dentro de las funciones. Se demuestra con `git grep AIza` (0 resultados), con la búsqueda de
+   `AIza` en el bundle exportado (0 resultados) y con el `curl` sin token que responde 401.
+2. **¿Qué pasa si alguien envía un perfil falso o un `tema` inventado?** El servidor no confía en el teléfono: el
+   esquema de zod tiene `.catch()` en cada campo, así que un `tema` que no está en la lista se convierte en
+   `general`, un `nivel` inválido en `intermedio` y un nombre con símbolos raros o de más de 40 caracteres queda
+   vacío. Nada inventado llega a las instrucciones del modelo.
+3. **¿Por qué el límite se cuenta con el cliente del usuario y no con la secret key?** Porque `ctx.supabase` lleva el
+   token del usuario y RLS solo le deja ver e insertar **sus** filas de `uso_ia`: no puede contar ni borrar el uso de
+   otros. Con la secret key la función se saltaría RLS y un error en el código podría contar o modificar filas de
+   cualquiera; además esa key no debe usarse donde no hace falta.
+4. **¿Qué se guarda en el teléfono y qué se envía a Google?** En el teléfono (SQLite): las fotos, sus descripciones,
+   el historial del chat y el perfil. A Google solo viaja, a través de la Edge Function, lo que cada petición
+   necesita: los últimos 20 mensajes del chat (con las fotos adjuntas, reducidas a 1024 px) o la foto que se
+   describe. La pantalla lo avisa antes de enviar una foto.
+
+### IA en la nube o en el dispositivo
+
+| | Nube (Gemini, lo que usa GeoCam) | Dispositivo (Edge AI) |
+| --- | --- | --- |
+| Sin conexión | No funciona (la app lo avisa y apaga el envío) | Funciona |
+| Privacidad | La foto sale del teléfono | Los datos se quedan |
+| Costo | Por token, con cuota gratuita | Gratis por uso, pero pesa en el APK |
+| Capacidad | Modelos grandes y multimodales: conversar, describir | Clasificar, detectar, leer texto |
+| Expo Go | Sí | No: requiere development build (Semana 14) |
 
 ## Semana 9 – Sincronización offline-first
 
