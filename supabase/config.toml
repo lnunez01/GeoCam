@@ -1,0 +1,11 @@
+project_id = "geocam"
+
+# Las tres funciones exigen un token de sesión válido (además lo comprueba withSupabase({ auth: 'user' }))
+[functions.tutor]
+verify_jwt = true
+
+[functions.describir-foto]
+verify_jwt = true
+
+[functions.tarjetas]
+verify_jwt = true
