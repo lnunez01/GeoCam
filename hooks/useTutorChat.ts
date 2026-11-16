@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import type { FileUIPart } from 'ai';
 import { useAuth } from '@/context/AuthContext';
@@ -41,6 +41,28 @@ export function useTutorChat() {
   }, [errorKind, signOut]);
 
   const busy = chat.status === 'submitted' || chat.status === 'streaming';
+
+  // Solo desarrollo: mide si la respuesta llega por partes (streaming) o de golpe.
+  // En la terminal de Metro se ve "[tutor] … llegó en N partes".
+  const streamLog = useRef({ start: 0, first: 0, updates: 0 });
+  const lastMessage = chat.messages[chat.messages.length - 1];
+  const lastLength = lastMessage?.parts.reduce((n, p) => n + (p.type === 'text' ? p.text.length : 0), 0) ?? 0;
+  useEffect(() => {
+    if (!__DEV__) return;
+    const log = streamLog.current;
+    if (chat.status === 'submitted') {
+      streamLog.current = { start: Date.now(), first: 0, updates: 0 };
+    } else if (chat.status === 'streaming' && lastMessage?.role === 'assistant') {
+      if (log.first === 0) log.first = Date.now();
+      log.updates++;
+    } else if (chat.status === 'ready' && log.start > 0) {
+      console.log(
+        `[tutor] primera palabra a los ${log.first ? log.first - log.start : '?'} ms; ` +
+          `respuesta completa a los ${Date.now() - log.start} ms; llegó en ${log.updates} partes (${lastLength} caracteres)`
+      );
+      log.start = 0;
+    }
+  }, [chat.status, lastLength, lastMessage?.role]);
 
   const send = useCallback(
     (text: string, photo: FileUIPart | null) => {
