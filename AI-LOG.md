@@ -58,6 +58,11 @@
   midió con un registro de desarrollo: llegaba en 6 partes en ~0,9 s, porque `gemini-3.5-flash-lite` manda trozos
   grandes y muy rápido. Se agregó `experimental_transform: smoothStream({ chunking: 'word' })` en la función
   `tutor` para repartir cada trozo palabra por palabra.
+- **Las tarjetas (C3) fallaban con `AI_APICallError: Requests ending with a model turn are not supported`.**
+  El código generado reenviaba el historial tal cual, y el chat siempre termina con la respuesta del tutor:
+  Gemini exige que el último turno sea del usuario. Primero se supuso (mal) que el problema era el esquema
+  `min/max` y se relajó; el log con `console.error` mostró la causa real. Se agregó al final un mensaje del
+  usuario que pide las tarjetas.
 - _Agregar aquí los errores que aparezcan al probar en el teléfono (al menos 2 son obligatorios en C6)._
 
 ## 4. Verificación

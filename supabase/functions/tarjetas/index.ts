@@ -57,7 +57,13 @@ export default {
           'A partir de la conversación entre un estudiante y su tutor, crea de 3 a 5 tarjetas de repaso en ' +
           'español. Cada tarjeta tiene una pregunta corta y una respuesta de 1 o 2 frases, basadas SOLO en lo ' +
           'que se habló.',
-        messages: await convertToModelMessages(messages.slice(-20)),
+        messages: [
+          ...(await convertToModelMessages(messages.slice(-20))),
+          // Gemini rechaza una conversación que termina con una respuesta del modelo ("Requests ending with
+          // a model turn are not supported"), y el chat siempre termina con la del tutor: se cierra con un
+          // turno del usuario que pide las tarjetas.
+          { role: 'user', content: 'Ahora crea las tarjetas de repaso de esta conversación.' },
+        ],
         output: Output.object({ schema: Tarjetas }),
         temperature: 0.2, // extraer y resumir: respuestas estables
         maxRetries: 1,
