@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FileUIPart, UIMessage } from 'ai';
+import { MarkdownText } from '@/components/MarkdownText';
 import { TarjetasModal } from '@/components/TarjetasModal';
 import { colors } from '@/constants/theme';
 import { useTutorChat } from '@/hooks/useTutorChat';
@@ -29,10 +30,13 @@ function Burbuja({ message }: { message: UIMessage }) {
     <View style={[styles.bubble, mine ? styles.mine : styles.theirs]}>
       {message.parts.map((part, i) => {
         if (part.type === 'text') {
-          return (
+          // Lo que escribe el usuario se muestra tal cual; la respuesta de la IA viene en Markdown
+          return mine ? (
             <Text key={i} style={styles.bubbleText} selectable>
               {part.text}
             </Text>
+          ) : (
+            <MarkdownText key={i} text={part.text} style={styles.bubbleText} />
           );
         }
         if (part.type === 'file' && part.mediaType.startsWith('image/')) {
