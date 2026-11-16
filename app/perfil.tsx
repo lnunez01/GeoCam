@@ -40,7 +40,7 @@ export default function PerfilScreen() {
           placeholder="Tu nombre"
           placeholderTextColor={colors.textMuted}
           style={styles.input}
-          maxLength={40}
+          maxLength={30}
         />
       </View>
 
