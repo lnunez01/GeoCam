@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { AiDescription } from '@/components/AiDescription';
 import { Chip } from '@/components/Chip';
 import { PhotoImage } from '@/components/PhotoImage';
 import { colors } from '@/constants/theme';
@@ -32,7 +33,7 @@ export default function FotoDetalleScreen() {
   const router = useRouter(); // SDK 58: se prefiere al router de módulo
   const params = useLocalSearchParams<{ id: string }>();
   const id = Number(params.id);
-  const { photo, isLoading, updateNote, toggleFavorite, moveToAlbum, remove } = usePhoto(id);
+  const { photo, isLoading, updateNote, toggleFavorite, moveToAlbum, updateDescription, remove } = usePhoto(id);
   const { albums } = useAlbums();
   // Semana 9: la subida es automática; el botón solo pide el mismo ciclo ya (no hay una segunda subida)
   const { syncNow, isSyncing: isUploading, isOnline } = useSync();
@@ -124,6 +125,18 @@ export default function FotoDetalleScreen() {
         <Text style={styles.label}>Nota</Text>
         {/* key: si la nota cambia desde la base, el editor se reinicia con el valor nuevo */}
         <NoteEditor key={photo.note ?? ''} initialNote={photo.note ?? ''} onSave={updateNote} />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.label}>Descripción con IA</Text>
+        {/* key: si la descripción llega desde la nube, el editor se reinicia con el valor nuevo */}
+        <AiDescription
+          key={photo.aiDescription ?? ''}
+          photoUri={photo.uri}
+          saved={photo.aiDescription}
+          isOnline={isOnline}
+          onSave={updateDescription}
+        />
       </View>
 
       <View style={styles.section}>

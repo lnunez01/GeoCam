@@ -42,6 +42,15 @@ export function usePhoto(id: number) {
     [id, ownerId]
   );
 
+  // Semana 10 (T5): guardar la descripción cambia updatedAt; la foto queda pendiente y se sube sola
+  const updateDescription = useCallback(
+    async (description: string | null) => {
+      await photosRepo.setDescription(id, ownerId, description);
+      requestSync();
+    },
+    [id, ownerId]
+  );
+
   const remove = useCallback(() => removePhotoById(id, ownerId), [id, ownerId]);
 
   return {
@@ -52,6 +61,7 @@ export function usePhoto(id: number) {
     updateNote,
     toggleFavorite,
     moveToAlbum,
+    updateDescription,
     remove,
   };
 }

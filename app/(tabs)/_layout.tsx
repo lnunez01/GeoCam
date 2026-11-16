@@ -40,6 +40,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>☁️</Text>,
         }}
       />
+      {/* Semana 10: chat con IA (streaming y fotos) */}
+      <Tabs.Screen
+        name="tutor"
+        options={{
+          title: 'Tutor IA',
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>✨</Text>,
+        }}
+      />
     </Tabs>
   );
 }
