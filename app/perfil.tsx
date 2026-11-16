@@ -12,6 +12,7 @@ const headerOptions = {
   headerTransparent: false, // SDK 58: en iOS 26+ sería transparente por defecto
   headerStyle: { backgroundColor: colors.background },
   headerTintColor: colors.text,
+  headerBackTitle: 'Atrás', // sin esto iOS muestra el nombre de la ruta anterior: "(tabs)"
   contentStyle: { backgroundColor: colors.background },
 } as const;
 

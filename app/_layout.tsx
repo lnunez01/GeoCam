@@ -36,6 +36,7 @@ function RootNavigator() {
             headerTransparent: false, // SDK 58: en iOS 26+ sería transparente por defecto
             headerStyle: { backgroundColor: colors.background },
             headerTintColor: colors.text,
+            headerBackTitle: 'Atrás', // sin esto iOS muestra el nombre de la ruta anterior: "(tabs)"
           }}
         />
         {/* Semana 10 (C2): perfil del Tutor IA */}

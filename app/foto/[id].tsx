@@ -26,6 +26,7 @@ const headerOptions = {
   headerTransparent: false,
   headerStyle: { backgroundColor: colors.background },
   headerTintColor: colors.text,
+  headerBackTitle: 'Atrás', // sin esto iOS muestra el nombre de la ruta anterior: "(tabs)"
   contentStyle: { backgroundColor: colors.background },
 } as const;
 

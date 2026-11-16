@@ -18,7 +18,7 @@ Las filas marcadas _Pendiente_ se llenan al probar en el teléfono.
 | 11 | Tarjetas (C3) | Conversar y pulsar **Tarjetas** | 3 a 5 tarjetas con pregunta y respuesta | _Pendiente_ |
 | 12 | Modo avión en el chat (C4) | Activar modo avión en Tutor IA | Banner de sin conexión, envío apagado, conversación visible | _Pendiente_ |
 | 13 | Modo avión en Describir (T4) | Activar modo avión en el detalle de una foto | Botón apagado con aviso; la descripción se puede editar y guardar | _Pendiente_ |
-| 14 | Describir con IA (T2) | Pulsar ✨ con red | Sugerencia en el editor; la consola de Metro dice que la foto viaja con < 300 KB | _Pendiente_ |
+| 14 | Describir con IA (T2) | Pulsar ✨ con red | Sugerencia en el editor; la consola de Metro dice que la foto viaja con < 300 KB | ✅ Sugerencia en el editor y guardada ([captura](docs/screenshots/semana10-describir.png)). Tamaño: _anotar el KB del log `[vision]`_ |
 | 15 | Descripción sincronizada (T5) | Guardar la descripción y mirar Supabase → `photos.ai_description` | La foto queda ⏳ y luego ☁️; la columna tiene el texto | _Pendiente_ |
 | 16 | Descripción en otro teléfono (T5) | Abrir la misma cuenta en otro teléfono | La descripción baja con la sincronización | _Pendiente_ |
 | 17 | Límite diario (C5) | `npx supabase secrets set LIMITE_DIARIO=3` y hacer 4 peticiones | La 4.ª muestra "Llegaste al límite…" sin botón Reintentar | _Pendiente_ |
